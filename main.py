@@ -94,8 +94,23 @@ class AutoClickerApp(App):
         # 初始化点击器
         if AUTO_CLICKER_AVAILABLE:
             self.auto_clicker = AndroidAutoClicker()
-            self.auto_clicker.set_screen_size(self.screen_width, self.screen_height)
+            
+            # 检测设备信息（Android平台）
+            self.auto_clicker.detect_device_info()
+            
+            # 设置日志回调
             self.auto_clicker.log_callback = self.log_message
+            
+            # 显示设备信息
+            if self.auto_clicker.device_info:
+                self.log_message("设备信息已检测")
+                self.log_message(f"  屏幕: {self.auto_clicker.device_info['width']}x{self.auto_clicker.device_info['height']}")
+                self.log_message(f"  架构: {self.auto_clicker.device_info['cpu_abi']}")
+                self.log_message(f"  模拟器: {'是' if self.auto_clicker.device_info['is_emulator'] else '否'}")
+            else:
+                self.log_message("使用默认屏幕尺寸")
+                self.auto_clicker.set_screen_size(self.screen_width, self.screen_height)
+            
             self.log_message("Android自动点击器已初始化")
         else:
             self.auto_clicker = None
@@ -259,40 +274,68 @@ class AutoClickerApp(App):
         """创建帮助标签页"""
         tab = TabbedPanelItem(text='帮助')
 
-        help_text = """[size=16][b]王者荣耀自动点击器 - 基础版[/b][/size]
+        help_text = """[size=16][b]王者荣耀自动点击器 - Android版[/b][/size]
 
 [size=14][b]功能说明[/b][/size]
-• 11步自动化流程
-• 坐标点击模式
-• 可配置坐标和等待时间
+• 找图功能：OpenCV模板匹配
+• 找字功能：文字模板匹配
+• 坐标点击：固定坐标（兜底）
+• 识别阈值：90%（避免误点）
+
+[size=14][b]分辨率自动适配[/b][/size]
+• 自动检测屏幕尺寸
+• 自动计算缩放比例
+• 支持竖屏和横屏
+• 基准分辨率：
+  - 竖屏：720x1280
+  - 横屏：1280x720
+
+[size=14][b]模拟器检测[/b][/size]
+• 自动检测运行环境
+• 识别模拟器特征
+• 支持的模拟器：
+  - 雷电模拟器
+  - 夜神模拟器
+  - MuMu模拟器
+  - BlueStacks
+  - Genymotion
+
+[size=14][b]识别流程[/b][/size]
+1. 截取屏幕
+2. 识别当前界面（找图/找字）
+3. 确认识别率 ≥ 90%
+4. 识别率不足 → 跳过点击
+5. 识别率足够 → 点击按钮
+
+[size=14][b]优先级[/b][/size]
+找图（最高） > 找字（次优） > 坐标点击（兜底）
+
+[size=14][b]11步流程[/b][/size]
+1. 登录 - 等待3秒
+2. 关闭弹窗 - 等待2秒
+3. 游戏大厅 - 等待2秒
+4. 王者峡谷匹配 - 等待2秒
+5. 人机模式 - 等待2秒
+6. 开始游戏 - 等待3秒
+7. 准备游戏 - 等待2秒
+8. 准备进入游戏 - 等待10秒
+9. 游戏结束 - 等待60秒
+10. 结算英雄 - 等待2秒
+11. 返回房间 - 等待3秒
 
 [size=14][b]使用说明[/b][/size]
 1. 在"配置"标签页设置坐标
 2. 在"主控制"标签页点击"开始"
 3. 按 ESC 或点击"停止"结束
 
-[size=14][b]11步流程[/b][/size]
-1. 登录 - 点击"开始游戏"
-2. 关闭弹窗 - 关闭活动弹窗
-3. 游戏大厅 - 点击"对战"
-4. 匹配 - 点击"王者峡谷"
-5. AI模式 - 选择"人机"
-6. 开始游戏 - 点击"开始"
-7. 准备游戏 - 点击"准备"
-8. 准备进入 - 确认进入游戏
-9. 游戏中 - 等待游戏结束
-10. 游戏结束 - 确认结束
-11. 结算英雄 - 查看结算
-
-[size=14][b]注意事项[/b][/size]
-• 需要授予无障碍服务权限
-• 需要授予悬浮窗权限
-• 基准分辨率: 1280x720
-• 其他分辨率需调整坐标
+[size=14][b]权限要求[/b][/size]
+• 无障碍服务：用于截图和点击
+• 悬浮窗权限：显示控制界面
 
 [size=14][b]版本信息[/b][/size]
-版本: v3.0 (基础版)
-功能: 坐标点击
+版本: v3.0 (完整版)
+功能: 找图+找字+坐标点击
+识别阈值: 90%
 """
 
         layout = BoxLayout(orientation='vertical', padding=10)

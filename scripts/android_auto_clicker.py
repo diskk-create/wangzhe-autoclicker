@@ -80,6 +80,10 @@ class AndroidAutoClicker:
         self.screen_height = 720
         self.scale_x = 1.0
         self.scale_y = 1.0
+        self.orientation = 'landscape'
+        
+        # 设备信息
+        self.device_info = None
         
         # 状态跟踪
         self.current_state = "unknown"
@@ -90,19 +94,149 @@ class AndroidAutoClicker:
         self.log_callback = None
     
     def set_screen_size(self, width, height):
-        """设置屏幕尺寸并计算缩放比例"""
+        """
+        设置屏幕尺寸并计算缩放比例
+        
+        自动处理竖屏/横屏
+        """
         self.screen_width = width
         self.screen_height = height
+        self.orientation = 'landscape' if width > height else 'portrait'
         
-        # 基准分辨率：1280x720
-        base_width = 1280
-        base_height = 720
+        # 基准分辨率：根据方向选择
+        if self.orientation == 'landscape':
+            # 横屏基准：1280x720
+            base_width = 1280
+            base_height = 720
+        else:
+            # 竖屏基准：720x1280
+            base_width = 720
+            base_height = 1280
         
         self.scale_x = width / base_width
         self.scale_y = height / base_height
         
-        self.log(f"屏幕尺寸: {width}x{height}")
-        self.log(f"缩放比例: X={self.scale_x:.2f}, Y={self.scale_y:.2f}")
+        self.log(f"屏幕尺寸: {width}x{height} ({self.orientation})")
+        self.log(f"基准尺寸: {base_width}x{base_height}")
+        self.log(f"缩放比例: X={self.scale_x:.3f}, Y={self.scale_y:.3f}")
+    
+    def detect_device_info(self):
+        """
+        检测设备信息（Android平台）
+        
+        检测：
+        - 屏幕尺寸
+        - 像素密度
+        - 架构（ARM/x86）
+        - 是否模拟器
+        """
+        if IS_ANDROID:
+            try:
+                # 使用pyjnius获取设备信息
+                from jnius import autoclass
+                
+                # 获取屏幕尺寸
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                activity = PythonActivity.mActivity
+                window_manager = activity.getWindowManager()
+                display = window_manager.getDefaultDisplay()
+                point = autoclass('android.graphics.Point')()
+                display.getSize(point)
+                
+                width = point.x
+                height = point.y
+                
+                # 获取像素密度
+                display_metrics = autoclass('android.util.DisplayMetrics')()
+                activity.getWindowManager().getDefaultDisplay().getMetrics(display_metrics)
+                density = display_metrics.density
+                density_dpi = display_metrics.densityDpi
+                
+                # 获取架构
+                Build = autoclass('android.os.Build')
+                cpu_abi = Build.SUPPORTED_ABIS[0] if hasattr(Build, 'SUPPORTED_ABIS') else Build.CPU_ABI
+                
+                # 检测模拟器
+                is_emulator = self._detect_emulator(Build)
+                
+                self.log(f"设备信息:")
+                self.log(f"  屏幕尺寸: {width}x{height}")
+                self.log(f"  像素密度: {density} ({density_dpi} DPI)")
+                self.log(f"  架构: {cpu_abi}")
+                self.log(f"  模拟器: {'是' if is_emulator else '否'}")
+                
+                # 设置屏幕尺寸
+                self.set_screen_size(width, height)
+                
+                # 保存设备信息
+                self.device_info = {
+                    'width': width,
+                    'height': height,
+                    'density': density,
+                    'density_dpi': density_dpi,
+                    'cpu_abi': cpu_abi,
+                    'is_emulator': is_emulator,
+                    'orientation': self.orientation
+                }
+                
+                return self.device_info
+                
+            except Exception as e:
+                self.log(f"检测设备信息失败: {e}")
+                # 使用默认值
+                self.set_screen_size(1280, 720)
+                return None
+        else:
+            # 桌面平台
+            self.log("桌面平台，使用默认屏幕尺寸")
+            self.set_screen_size(1280, 720)
+            return None
+    
+    def _detect_emulator(self, Build):
+        """
+        检测是否为模拟器
+        
+        Args:
+            Build: Android Build类
+        
+        Returns:
+            bool: 是否为模拟器
+        """
+        try:
+            # 检查模拟器特征
+            emulator_signatures = [
+                'generic',
+                'emulator',
+                'sdk',
+                'google_sdk',
+                'droid4x',
+                'andy',
+                'nox',
+                'bluestacks',
+                'genymotion',
+                'memu'
+            ]
+            
+            # 检查设备型号
+            model = Build.MODEL.lower()
+            product = Build.PRODUCT.lower()
+            manufacturer = Build.MANUFACTURER.lower()
+            
+            for signature in emulator_signatures:
+                if signature in model or signature in product or signature in manufacturer:
+                    return True
+            
+            # 检查架构
+            cpu_abi = Build.CPU_ABI.lower()
+            if 'x86' in cpu_abi:
+                # x86架构可能是模拟器
+                if 'generic' in model or 'sdk' in model:
+                    return True
+            
+            return False
+            
+        except Exception:
+            return False
     
     def adapt_coordinate(self, x, y):
         """适配坐标"""
