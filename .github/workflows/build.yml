@@ -16,44 +16,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
+    - name: Build with buildozer
+      uses: ArtemSBulgakov/buildozer-action@v1
+      id: build
       with:
-        python-version: '3.10'
-
-    - name: Install system dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake
-
-    - name: Install buildozer
-      run: |
-        pip install --upgrade pip
-        pip install buildozer cython
-
-    - name: Cache buildozer dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.buildozer
-          ~/.gradle
-        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
-        restore-keys: |
-          ${{ runner.os }}-buildozer-
-
-    - name: Build APK
-      run: |
-        buildozer android debug
-      env:
-        BUILDOZER_WARN_ON_ROOT: 1
-
-    - name: Rename APK with version
-      run: |
-        cd bin
-        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-        for apk in *.apk; do
-          mv "$apk" "wangzheautoclicker_v3.0_${TIMESTAMP}.apk"
-        done
+        command: android debug
+        buildozer_version: stable
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
@@ -61,11 +29,3 @@ jobs:
         name: wangzhe-autoclicker-v3-apk
         path: bin/*.apk
         retention-days: 30
-
-    - name: Create release on tag
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: bin/*.apk
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
