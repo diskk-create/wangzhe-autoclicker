@@ -5,23 +5,22 @@ title = WangZheAutoClicker
 package.name = wangzheautoclicker
 package.domain = org.wangzhe
 
-# 源代码（只包含main.py和assets）
+# 源代码
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
-source.exclude_dirs = scripts,tests,docs
 
 # 版本
 version = 3.0.0
 
-# 依赖
-requirements = python3,kivy
+# 依赖（尝试包含OpenCV）
+requirements = python3,kivy,pyjnius,opencv,numpy
 
 # 屏幕方向
 orientation = portrait
 fullscreen = 0
 
 # Android权限
-android.permissions = SYSTEM_ALERT_WINDOW
+android.permissions = SYSTEM_ALERT_WINDOW,BIND_ACCESSIBILITY_SERVICE,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 
 # Android API
 android.api = 31

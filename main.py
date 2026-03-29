@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-王者荣耀自动点击器 - 基础版
-功能：坐标点击（无OpenCV，确保能构建成功）
+王者荣耀自动点击器 - Android版
+功能：找图 + 找字 + 坐标点击（优先级递减）
 """
 
 from kivy.app import App
@@ -20,12 +20,17 @@ import os
 import threading
 import time
 
-# === 修复：初始化属性，防止启动崩溃 ===
-# 必须在导入后立即设置，避免后续代码访问未初始化的属性
+# 导入Android点击器
+try:
+    from scripts.android_auto_clicker import AndroidAutoClicker
+    AUTO_CLICKER_AVAILABLE = True
+except ImportError:
+    AUTO_CLICKER_AVAILABLE = False
+    print("[WARNING] AndroidAutoClicker不可用")
 
 
 class AutoClickerApp(App):
-    """主应用类 - 基础版"""
+    """主应用类 - Android版"""
 
     title = "王者荣耀自动点击器"
     use_kivy_settings = True
@@ -86,8 +91,18 @@ class AutoClickerApp(App):
         # 加载配置
         self.load_config()
 
+        # 初始化点击器
+        if AUTO_CLICKER_AVAILABLE:
+            self.auto_clicker = AndroidAutoClicker()
+            self.auto_clicker.set_screen_size(self.screen_width, self.screen_height)
+            self.auto_clicker.log_callback = self.log_message
+            self.log_message("Android自动点击器已初始化")
+        else:
+            self.auto_clicker = None
+            self.log_message("警告: AndroidAutoClicker不可用")
+
         # 延迟检测设备
-        Clock.schedule_once(lambda dt: self.log_message("基础版已启动，等待操作..."), 1)
+        Clock.schedule_once(lambda dt: self.log_message("应用已启动，等待操作..."), 1)
 
         return self.layout
 
@@ -405,6 +420,31 @@ class AutoClickerApp(App):
     def run_script(self):
         """运行脚本（线程函数）"""
         try:
+            # 使用AndroidAutoClicker
+            if self.auto_clicker:
+                # 设置运行状态
+                self.auto_clicker.is_running = True
+                self.auto_clicker.is_paused = False
+                
+                # 执行11步流程
+                self.auto_clicker.run_11_step_flow()
+                
+                self.log_message("脚本执行完成")
+            else:
+                # 降级：使用简单的坐标点击
+                self.log_message("使用降级模式：坐标点击")
+                self.run_simple_click()
+
+        except Exception as e:
+            self.log_message(f"脚本执行错误: {e}")
+
+        finally:
+            # 更新UI（需要在主线程）
+            Clock.schedule_once(self._script_finished, 0)
+    
+    def run_simple_click(self):
+        """降级模式：简单坐标点击"""
+        try:
             # 加载配置
             config = json.loads(self.config_text.text)
             steps = config.get('steps', [])
@@ -451,14 +491,10 @@ class AutoClickerApp(App):
                 if not self.is_running:
                     break
 
-            self.log_message("脚本执行完成")
+            self.log_message("降级模式执行完成")
 
         except Exception as e:
-            self.log_message(f"脚本执行错误: {e}")
-
-        finally:
-            # 更新UI（需要在主线程）
-            Clock.schedule_once(self._script_finished, 0)
+            self.log_message(f"降级模式错误: {e}")
 
     def _script_finished(self, dt):
         """脚本结束"""
