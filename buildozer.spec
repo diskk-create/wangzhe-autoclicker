@@ -12,31 +12,24 @@ source.include_exts = py,png,jpg,kv,atlas,json,txt
 # 版本
 version = 3.0.0
 
-# 依赖（最简化）
+# 依赖（最小化）
 requirements = python3,kivy
 
 # 屏幕方向
 orientation = portrait
-fullscreen = 0
 
-# Android权限
-android.permissions = SYSTEM_ALERT_WINDOW
-
-# Android API
-android.api = 31
+# Android API（使用稳定版本）
+android.api = 27
 android.minapi = 21
+android.ndk = 19b
 
-# SDK设置
-android.skip_update = False
+# 架构（只构建ARM）
+android.archs = armeabi-v7a
+
+# 接受许可证
 android.accept_sdk_license = True
-
-# 架构（只构建ARM，减少构建时间）
-android.archs = armeabi-v7a,arm64-v8a
 
 [buildozer]
 
 # 日志级别
 log_level = 2
-
-# 警告root用户
-warn_on_root = 1
