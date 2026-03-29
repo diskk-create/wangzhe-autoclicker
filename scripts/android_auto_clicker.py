@@ -483,46 +483,50 @@ class AndroidAutoClicker:
         Returns:
             bool: 是否成功
         """
-        # 优先级1: 找图
-        if button_name in self.image_templates and OPENCV_AVAILABLE:
-            screenshot = self.capture_screen()
-            if screenshot is not None:
-                matched, position, score = self.match_template(
-                    screenshot,
-                    self.image_templates[button_name]
-                )
-                # 确保识别率≥90%
-                if matched and score >= 0.9:
-                    self.log(f"找图成功: {button_name} (置信度: {score*100:.1f}%)")
-                    self.click(position[0], position[1])
-                    return True
-                elif matched and score < 0.9:
-                    self.log(f"找图置信度不足: {button_name} ({score*100:.1f}% < 90%)")
-        
-        # 优先级2: 找字
-        if button_name in self.text_templates and OPENCV_AVAILABLE:
-            screenshot = self.capture_screen()
-            if screenshot is not None:
-                has_text, x, y, w, h, score = self.detect_text_template(
-                    screenshot,
-                    button_name
-                )
-                # 确保识别率≥90%
-                if has_text and score >= 0.9:
-                    self.log(f"找字成功: {button_name} (置信度: {score*100:.1f}%)")
-                    # 点击文字中心
-                    center_x = x + w // 2
-                    center_y = y + h // 2
-                    self.click(center_x, center_y)
-                    return True
-                elif has_text and score < 0.9:
-                    self.log(f"找字置信度不足: {button_name} ({score*100:.1f}% < 90%)")
+        # 如果OpenCV可用，优先使用找图找字
+        if OPENCV_AVAILABLE:
+            # 优先级1: 找图
+            if button_name in self.image_templates:
+                screenshot = self.capture_screen()
+                if screenshot is not None:
+                    matched, position, score = self.match_template(
+                        screenshot,
+                        self.image_templates[button_name]
+                    )
+                    # 确保识别率≥90%
+                    if matched and score >= 0.9:
+                        self.log(f"找图成功: {button_name} (置信度: {score*100:.1f}%)")
+                        self.click(position[0], position[1])
+                        return True
+                    elif matched and score < 0.9:
+                        self.log(f"找图置信度不足: {button_name} ({score*100:.1f}% < 90%)")
+            
+            # 优先级2: 找字
+            if button_name in self.text_templates:
+                screenshot = self.capture_screen()
+                if screenshot is not None:
+                    has_text, x, y, w, h, score = self.detect_text_template(
+                        screenshot,
+                        button_name
+                    )
+                    # 确保识别率≥90%
+                    if has_text and score >= 0.9:
+                        self.log(f"找字成功: {button_name} (置信度: {score*100:.1f}%)")
+                        # 点击文字中心
+                        center_x = x + w // 2
+                        center_y = y + h // 2
+                        self.click(center_x, center_y)
+                        return True
+                    elif has_text and score < 0.9:
+                        self.log(f"找字置信度不足: {button_name} ({score*100:.1f}% < 90%)")
+        else:
+            # OpenCV不可用，提示用户
+            self.log("OpenCV不可用，跳过找图找字")
         
         # 优先级3: 坐标点击（兜底）
         if button_name in self.buttons:
             button = self.buttons[button_name]
             self.log(f"坐标点击: {button_name} ({button['desc']})")
-            self.log(f"警告: 使用坐标点击，可能不准确")
             self.click(button['x'], button['y'])
             return True
         
