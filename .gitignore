@@ -1,30 +1,49 @@
-# 忽略Python缓存
+# Buildozer
+.buildozer/
+bin/
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# 忽略buildozer构建目录
-.buildozer/
-bin/
-
-# 忽略虚拟环境
+# Virtual environments
 venv/
-env/
 ENV/
+env/
 
-# 忽略IDE配置
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# 忽略系统文件
+# OS
 .DS_Store
 Thumbs.db
 
-# 忽略构建产物
-*.apk
-*.aab
-*.ipa
+# Logs
+*.log
+
+# Temp files
+*.tmp
+*.temp
+current_screen.png

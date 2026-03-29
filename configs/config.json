@@ -1,0 +1,79 @@
+{
+  "buttons": {
+    "login": {
+      "x": 641,
+      "y": 564,
+      "desc": "登录"
+    },
+    "login_popup": {
+      "x": 1190,
+      "y": 112,
+      "desc": "关闭弹窗"
+    },
+    "game_lobby": {
+      "x": 514,
+      "y": 544,
+      "desc": "游戏大厅"
+    },
+    "match_screen": {
+      "x": 398,
+      "y": 539,
+      "desc": "匹配"
+    },
+    "ai_mode_screen": {
+      "x": 730,
+      "y": 601,
+      "desc": "AI模式"
+    },
+    "start_game_screen": {
+      "x": 1057,
+      "y": 569,
+      "desc": "开始游戏"
+    },
+    "prepare_screen": {
+      "x": 775,
+      "y": 660,
+      "desc": "准备游戏"
+    },
+    "ready_game": {
+      "x": 640,
+      "y": 561,
+      "desc": "准备进入"
+    },
+    "game_over": {
+      "x": 635,
+      "y": 664,
+      "desc": "游戏结束"
+    },
+    "settlement_hero": {
+      "x": 645,
+      "y": 621,
+      "desc": "结算英雄"
+    },
+    "return_room": {
+      "x": 739,
+      "y": 651,
+      "desc": "返回房间"
+    }
+  },
+  "settings": {
+    "wait_time": 3,
+    "threshold": 0.7,
+    "max_loops": 100,
+    "adb_path": "adb",
+    "adb_device": "127.0.0.1:21503"
+  },
+  "templates": {
+    "login": "template_login.png",
+    "login_popup": "template_login_popup.png",
+    "game_lobby": "template_game_lobby.png",
+    "match_screen": "template_match.png",
+    "ai_mode_screen": "template_ai_mode.png",
+    "start_game_screen": "template_start_game.png",
+    "prepare_screen": "template_prepare.png",
+    "ready_game": "template_ready_game.png",
+    "game_over": "template_game_over.png",
+    "settlement_hero": "text_template_settlement_hero.png",
+    "return_room": "text_template_return_room.png"
+  }
+}

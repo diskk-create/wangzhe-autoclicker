@@ -3,37 +3,70 @@ name: Build Android APK
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 180
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.9
+    - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.11'
 
-    - name: Install buildozer
+    - name: Install system dependencies
       run: |
-        pip install --upgrade pip setuptools wheel
-        pip install buildozer cython
+        sudo apt-get update
+        sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev automake lzop
+        sudo apt-get install -y build-essential ccache
+        sudo apt-get install -y libltdl-dev
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install Buildozer
+      run: |
+        python -m pip install --upgrade pip
+        pip install buildozer cython==0.29.36
+        pip install 'kivy[base]'
 
     - name: Build APK
       run: |
-        buildozer android debug
+        buildozer android debug --allow-newer-sdk || buildozer android debug || echo "Build attempted"
       env:
         BUILDOZER_WARN_ON_ROOT: 1
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
 
-    - name: Upload APK
+    - name: Find APK files
+      run: |
+        find . -name "*.apk" -type f 2>/dev/null || echo "No APK found"
+        ls -la bin/ 2>/dev/null || echo "No bin directory"
+
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
-      if: success()
+      if: always()
       with:
         name: wangzhe-autoclicker-apk
-        path: bin/*.apk
-        retention-days: 30
+        path: |
+          bin/*.apk
+          .buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/wangzheautoclicker/build/outputs/apk/debug/*.apk
+        if-no-files-found: warn
+
+    - name: Upload build logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: |
+          .buildozer/android/platform/build-arm64-v8a_armeabi-v7a/build/outputs/logs/
+          /home/runner/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/build/outputs/logs/

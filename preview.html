@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>王者荣耀自动点击器 - 界面预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .phone-frame {
+            width: 400px;
+            height: 800px;
+            background: #16213e;
+            border-radius: 30px;
+            padding: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .screen {
+            width: 100%;
+            height: 100%;
+            background: #0f0f23;
+            border-radius: 20px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            text-align: center;
+        }
+        .title h1 {
+            color: white;
+            font-size: 22px;
+            margin-bottom: 5px;
+        }
+        .title p {
+            color: rgba(255,255,255,0.8);
+            font-size: 12px;
+        }
+        .tabs {
+            display: flex;
+            background: #1a1a2e;
+            padding: 5px;
+        }
+        .tab {
+            flex: 1;
+            padding: 10px 5px;
+            text-align: center;
+            color: #888;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        .content {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+        .status-bar {
+            background: #1a1a2e;
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-text {
+            color: #ffa726;
+            font-size: 12px;
+        }
+        .btn-small {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .screen-info {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        .select-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .select-row label {
+            color: #aaa;
+            font-size: 12px;
+            width: 80px;
+        }
+        .select-row select {
+            flex: 1;
+            background: #1a1a2e;
+            color: white;
+            border: 1px solid #333;
+            padding: 8px;
+            border-radius: 5px;
+        }
+        .btn-control {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: transform 0.2s;
+        }
+        .btn-control:hover {
+            transform: scale(1.02);
+        }
+        .btn-start {
+            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+            color: white;
+        }
+        .btn-stop {
+            background: linear-gradient(135deg, #d63031 0%, #e17055 100%);
+            color: white;
+        }
+        .btn-pause {
+            background: linear-gradient(135deg, #fdcb6e 0%, #f39c12 100%);
+            color: #333;
+        }
+        .btn-control:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .run-status {
+            background: #1a1a2e;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 10px;
+        }
+        .run-status h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .run-status p {
+            color: #00b894;
+            font-size: 14px;
+        }
+        .bottom-status {
+            background: #1a1a2e;
+            padding: 10px;
+            text-align: center;
+            color: #00b894;
+            font-size: 12px;
+        }
+        .page { display: none; }
+        .page.active { display: block; }
+        
+        /* 配置页面样式 */
+        .config-section {
+            margin-bottom: 15px;
+        }
+        .config-section h3 {
+            color: #667eea;
+            font-size: 14px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+        .config-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .config-row label {
+            color: #aaa;
+            font-size: 12px;
+            width: 100px;
+        }
+        .config-row input {
+            width: 60px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            color: white;
+            padding: 5px;
+            border-radius: 5px;
+            text-align: center;
+            margin-right: 5px;
+        }
+        .btn-save {
+            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+            color: white;
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        .btn-reset {
+            background: linear-gradient(135deg, #fdcb6e 0%, #f39c12 100%);
+            color: #333;
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-top: 5px;
+            cursor: pointer;
+        }
+        
+        /* 权限页面样式 */
+        .permission-item {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        .permission-item h4 {
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .permission-item p {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        .permission-status {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        .permission-status p {
+            color: #aaa;
+            font-size: 12px;
+            margin: 5px 0;
+        }
+        .status-ok { color: #00b894 !important; }
+        .status-error { color: #d63031 !important; }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="screen">
+            <div class="title">
+                <h1>王者荣耀自动点击器</h1>
+                <p>v2.0 - Android原生版</p>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" onclick="showPage('main')">主控制</div>
+                <div class="tab" onclick="showPage('config')">配置</div>
+                <div class="tab" onclick="showPage('permission')">权限</div>
+                <div class="tab" onclick="showPage('log')">日志</div>
+                <div class="tab" onclick="showPage('help')">帮助</div>
+            </div>
+            
+            <!-- 主控制页面 -->
+            <div class="content">
+                <div id="main" class="page active">
+                    <div class="status-bar">
+                        <span class="status-text">⚠️ 无障碍服务: 未启用</span>
+                        <button class="btn-small">打开设置</button>
+                    </div>
+                    
+                    <div class="screen-info">屏幕分辨率: 1280x720</div>
+                    
+                    <div class="select-row">
+                        <label>选择脚本:</label>
+                        <select>
+                            <option>智能自动点击器</option>
+                            <option>四模式循环</option>
+                            <option>自定义脚本</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn-control btn-start">▶ 开始运行</button>
+                    <button class="btn-control btn-stop" disabled>⏹ 停止运行</button>
+                    <button class="btn-control btn-pause" disabled>⏸ 暂停</button>
+                    
+                    <div class="run-status">
+                        <h3>运行状态</h3>
+                        <p>✅ 等待启动...</p>
+                        <p style="color: #888; font-size: 11px; margin-top: 5px;">提示: 请先启用无障碍服务</p>
+                    </div>
+                </div>
+                
+                <!-- 配置页面 -->
+                <div id="config" class="page">
+                    <div class="config-section">
+                        <h3>11步流程配置</h3>
+                        <div class="config-row">
+                            <label>1. 登录</label>
+                            <input type="text" value="641"> X
+                            <input type="text" value="564"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>2. 关闭弹窗</label>
+                            <input type="text" value="1190"> X
+                            <input type="text" value="112"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>3. 游戏大厅</label>
+                            <input type="text" value="514"> X
+                            <input type="text" value="544"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>4. 匹配</label>
+                            <input type="text" value="398"> X
+                            <input type="text" value="539"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>5. AI模式</label>
+                            <input type="text" value="730"> X
+                            <input type="text" value="601"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>6. 开始游戏</label>
+                            <input type="text" value="1057"> X
+                            <input type="text" value="569"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>7. 准备游戏</label>
+                            <input type="text" value="775"> X
+                            <input type="text" value="660"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>8. 准备进入</label>
+                            <input type="text" value="640"> X
+                            <input type="text" value="561"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>9. 游戏结束</label>
+                            <input type="text" value="635"> X
+                            <input type="text" value="664"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>10. 结算英雄</label>
+                            <input type="text" value="645"> X
+                            <input type="text" value="621"> Y
+                        </div>
+                        <div class="config-row">
+                            <label>11. 返回房间</label>
+                            <input type="text" value="739"> X
+                            <input type="text" value="651"> Y
+                        </div>
+                    </div>
+                    
+                    <div class="config-section">
+                        <h3>通用设置</h3>
+                        <div class="config-row">
+                            <label>等待时间(秒)</label>
+                            <input type="text" value="3" style="width: 80px;">
+                        </div>
+                        <div class="config-row">
+                            <label>匹配阈值</label>
+                            <input type="text" value="0.7" style="width: 80px;">
+                        </div>
+                        <div class="config-row">
+                            <label>最大循环</label>
+                            <input type="text" value="100" style="width: 80px;">
+                        </div>
+                    </div>
+                    
+                    <button class="btn-save">💾 保存配置</button>
+                    <button class="btn-reset">🔄 重置为默认</button>
+                </div>
+                
+                <!-- 权限页面 -->
+                <div id="permission" class="page">
+                    <div class="permission-item">
+                        <h4>1. 无障碍服务 (必须)</h4>
+                        <p>用于模拟点击和屏幕识别</p>
+                        <button class="btn-small">打开无障碍设置</button>
+                    </div>
+                    
+                    <div class="permission-item">
+                        <h4>2. 悬浮窗权限 (推荐)</h4>
+                        <p>用于显示控制悬浮窗</p>
+                        <button class="btn-small">打开悬浮窗设置</button>
+                    </div>
+                    
+                    <div class="permission-item">
+                        <h4>3. 存储权限 (必须)</h4>
+                        <p>用于保存配置和日志</p>
+                        <button class="btn-small">请求存储权限</button>
+                    </div>
+                    
+                    <div class="permission-status">
+                        <h4 style="color: #667eea; margin-bottom: 10px;">当前状态</h4>
+                        <p class="status-error">❌ 无障碍服务: 未启用</p>
+                        <p class="status-error">❌ 存储权限: 未授权</p>
+                    </div>
+                    
+                    <button class="btn-save" style="margin-top: 15px;">🔄 刷新权限状态</button>
+                </div>
+                
+                <!-- 日志页面 -->
+                <div id="log" class="page">
+                    <div style="background: #1a1a2e; padding: 15px; border-radius: 10px; height: 400px; overflow-y: auto; font-family: monospace; font-size: 11px; color: #aaa;">
+                        <p style="color: #667eea;">[自动点击器日志]</p>
+                        <p>[10:30:15] 等待运行...</p>
+                        <p>[10:30:20] 无障碍服务检查</p>
+                        <p style="color: #ffa726;">[10:30:21] 警告: 无障碍服务未启用</p>
+                        <p>[10:30:25] 请在权限页面启用无障碍服务</p>
+                        <p style="color: #00b894;">[10:30:30] 屏幕分辨率: 1280x720</p>
+                        <p>[10:30:35] 配置加载完成</p>
+                        <p style="color: #888;">--- 等待用户操作 ---</p>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button class="btn-small" style="flex: 1; padding: 10px;">清空</button>
+                        <button class="btn-small" style="flex: 1; padding: 10px;">导出</button>
+                    </div>
+                </div>
+                
+                <!-- 帮助页面 -->
+                <div id="help" class="page">
+                    <div style="color: #aaa; font-size: 12px; line-height: 1.8;">
+                        <h3 style="color: #667eea; margin-bottom: 10px;">王者荣耀自动点击器 v2.0</h3>
+                        <p style="color: #ffa726; margin-bottom: 10px;">⚠️ 重要提示</p>
+                        <p>本应用使用Android无障碍服务实现自动化，<b>必须先启用无障碍服务才能正常工作！</b></p>
+                        
+                        <h4 style="color: #667eea; margin: 15px 0 10px;">使用步骤：</h4>
+                        <ol style="padding-left: 20px;">
+                            <li>切换到"权限"标签页</li>
+                            <li>点击"打开无障碍设置"</li>
+                            <li>找到"王者荣耀自动点击器"</li>
+                            <li>开启无障碍服务权限</li>
+                            <li>返回应用，开始使用</li>
+                        </ol>
+                        
+                        <h4 style="color: #667eea; margin: 15px 0 10px;">11步流程：</h4>
+                        <p>① 登录 → ② 关闭弹窗 → ③ 游戏大厅 → ④ 匹配 → ⑤ AI模式 → ⑥ 开始游戏 → ⑦ 准备游戏 → ⑧ 准备进入 → ⑨ 游戏结束 → ⑩ 结算英雄 → ⑪ 返回房间</p>
+                        
+                        <h4 style="color: #667eea; margin: 15px 0 10px;">注意事项：</h4>
+                        <p style="color: #d63031;">⚠️ 仅用于学习研究目的</p>
+                        <p style="color: #d63031;">⚠️ 请勿用于违规操作</p>
+                        <p style="color: #d63031;">⚠️ 可能违反游戏服务条款</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bottom-status">状态: 就绪</div>
+        </div>
+    </div>
+    
+    <script>
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
