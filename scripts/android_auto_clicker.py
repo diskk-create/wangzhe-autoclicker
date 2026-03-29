@@ -72,8 +72,8 @@ class AndroidAutoClicker:
             "return_room": "text_template_return_room.png"
         }
         
-        # 匹配阈值
-        self.match_threshold = 0.7
+        # 匹配阈值（0.9 = 90%，确保高识别率）
+        self.match_threshold = 0.9
         
         # 屏幕尺寸（运行时设置）
         self.screen_width = 1280
@@ -239,9 +239,109 @@ class AndroidAutoClicker:
             # 桌面平台：模拟点击（测试用）
             self.log("桌面平台模拟点击")
     
+    def detect_screen_with_text(self, screenshot):
+        """
+        检测当前屏幕（找图 + 找字）
+        
+        优先级：
+        1. 找图（按钮模板）
+        2. 找字（文字模板）
+        
+        Args:
+            screenshot: 截屏图像
+        
+        Returns:
+            tuple: (屏幕名称, 匹配置信度, 文字信息)
+        """
+        if not OPENCV_AVAILABLE or screenshot is None:
+            return "unknown", 0, None
+        
+        # 优先级1：找图（按钮模板）
+        screen, score = self.detect_screen(screenshot)
+        
+        # 如果找到特定屏幕，直接返回
+        if screen in ["match_screen", "start_game_screen"]:
+            return screen, score, None
+        
+        # 优先级2：找字（文字模板）
+        # 检测登录文字
+        has_login, x, y, w, h, login_score = self.detect_text_template(screenshot, "login")
+        if has_login and login_score >= self.match_threshold:
+            return "login", login_score, {"text": "login", "pos": (x, y, w, h)}
+        
+        # 检测游戏大厅文字
+        has_lobby, x, y, w, h, lobby_score = self.detect_text_template(screenshot, "game_lobby")
+        if has_lobby and lobby_score >= self.match_threshold:
+            return "game_lobby", lobby_score, {"text": "game_lobby", "pos": (x, y, w, h)}
+        
+        # 检测王者峡谷文字（AI模式）
+        has_wangzhe, x, y, w, h, text_score = self.detect_text_template(screenshot, "wangzhe_xiagu")
+        if has_wangzhe and text_score >= self.match_threshold:
+            return "ai_mode_screen", text_score, {"text": "wangzhe_xiagu", "pos": (x, y, w, h)}
+        
+        # 检测结算英雄文字
+        has_settlement, x, y, w, h, settlement_score = self.detect_text_template(screenshot, "settlement_hero")
+        if has_settlement and settlement_score >= self.match_threshold:
+            return "settlement_hero", settlement_score, {"text": "settlement_hero", "pos": (x, y, w, h)}
+        
+        # 检测返回房间文字
+        has_return, x, y, w, h, return_score = self.detect_text_template(screenshot, "return_room")
+        if has_return and return_score >= self.match_threshold:
+            return "return_room", return_score, {"text": "return_room", "pos": (x, y, w, h)}
+        
+        # 返回找图结果
+        return screen, score, None
+    
+    def detect_text_template(self, screenshot, template_name):
+        """
+        检测文字模板
+        
+        Args:
+            screenshot: 截屏图像
+            template_name: 模板名称
+        
+        Returns:
+            tuple: (是否匹配, x, y, w, h, 置信度)
+        """
+        if template_name not in self.text_templates:
+            return False, 0, 0, 0, 0, 0.0
+        
+        template_file = os.path.join(self.template_dir, self.text_templates[template_name])
+        if not os.path.exists(template_file):
+            return False, 0, 0, 0, 0, 0.0
+        
+        try:
+            template = cv2.imread(template_file, cv2.IMREAD_GRAYSCALE)
+            if template is None:
+                return False, 0, 0, 0, 0, 0.0
+            
+            screenshot_gray = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
+            
+            # 检查模板尺寸
+            if template.shape[0] > screenshot_gray.shape[0] or \
+               template.shape[1] > screenshot_gray.shape[1]:
+                return False, 0, 0, 0, 0, 0.0
+            
+            # 模板匹配
+            result = cv2.matchTemplate(screenshot_gray, template, cv2.TM_CCOEFF_NORMED)
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+            
+            if max_val >= self.match_threshold:
+                th, tw = template.shape
+                x, y = max_loc
+                return True, x, y, tw, th, max_val
+            
+            return False, 0, 0, 0, 0, max_val
+            
+        except Exception as e:
+            self.log(f"文字模板检测失败: {e}")
+            return False, 0, 0, 0, 0, 0.0
+    
     def smart_click(self, button_name):
         """
         智能点击（找图 > 找字 > 坐标）
+        
+        注意：必须先识别屏幕，确认匹配率≥90%，再点击
         
         Args:
             button_name: 按钮名称
@@ -257,28 +357,38 @@ class AndroidAutoClicker:
                     screenshot,
                     self.image_templates[button_name]
                 )
-                if matched:
-                    self.log(f"找图成功: {button_name} (置信度: {score:.2f})")
+                # 确保识别率≥90%
+                if matched and score >= 0.9:
+                    self.log(f"找图成功: {button_name} (置信度: {score*100:.1f}%)")
                     self.click(position[0], position[1])
                     return True
+                elif matched and score < 0.9:
+                    self.log(f"找图置信度不足: {button_name} ({score*100:.1f}% < 90%)")
         
         # 优先级2: 找字
         if button_name in self.text_templates and OPENCV_AVAILABLE:
             screenshot = self.capture_screen()
             if screenshot is not None:
-                matched, position, score = self.match_template(
+                has_text, x, y, w, h, score = self.detect_text_template(
                     screenshot,
-                    self.text_templates[button_name]
+                    button_name
                 )
-                if matched:
-                    self.log(f"找字成功: {button_name} (置信度: {score:.2f})")
-                    self.click(position[0], position[1])
+                # 确保识别率≥90%
+                if has_text and score >= 0.9:
+                    self.log(f"找字成功: {button_name} (置信度: {score*100:.1f}%)")
+                    # 点击文字中心
+                    center_x = x + w // 2
+                    center_y = y + h // 2
+                    self.click(center_x, center_y)
                     return True
+                elif has_text and score < 0.9:
+                    self.log(f"找字置信度不足: {button_name} ({score*100:.1f}% < 90%)")
         
         # 优先级3: 坐标点击（兜底）
         if button_name in self.buttons:
             button = self.buttons[button_name]
             self.log(f"坐标点击: {button_name} ({button['desc']})")
+            self.log(f"警告: 使用坐标点击，可能不准确")
             self.click(button['x'], button['y'])
             return True
         
@@ -286,7 +396,16 @@ class AndroidAutoClicker:
         return False
     
     def run_11_step_flow(self):
-        """执行11步流程"""
+        """
+        执行11步流程
+        
+        流程：
+        1. 截屏
+        2. 识别当前屏幕（找图/找字）
+        3. 确认识别率≥90%
+        4. 点击对应按钮
+        5. 等待界面切换
+        """
         steps = [
             ("login", "登录", 3),
             ("login_popup", "关闭弹窗", 2),
@@ -309,16 +428,55 @@ class AndroidAutoClicker:
             while self.is_paused:
                 time.sleep(0.1)
             
+            self.log(f"=" * 60)
             self.log(f"步骤: {desc} ({step_name})")
+            self.log(f"=" * 60)
+            
+            # 截屏
+            self.log("[1] 截取屏幕...")
+            screenshot = self.capture_screen()
+            
+            if screenshot is None:
+                self.log("[ERROR] 截屏失败")
+                # 降级：使用坐标点击
+                if step_name in self.buttons:
+                    button = self.buttons[step_name]
+                    self.log(f"[降级] 使用坐标点击: ({button['x']}, {button['y']})")
+                    self.click(button['x'], button['y'])
+                    time.sleep(wait_time)
+                continue
+            
+            # 识别屏幕
+            self.log("[2] 识别当前屏幕...")
+            screen_name, match_score, text_info = self.detect_screen_with_text(screenshot)
+            
+            if text_info:
+                self.log(f"[识别] 屏幕: {screen_name} (文字: {text_info['text']}, 置信度: {match_score*100:.1f}%)")
+            else:
+                self.log(f"[识别] 屏幕: {screen_name} (置信度: {match_score*100:.1f}%)")
+            
+            # 确认识别率
+            if match_score < 0.9:
+                self.log(f"[警告] 识别率不足90%: {match_score*100:.1f}%")
+                self.log(f"[跳过] 不执行点击，避免误操作")
+                # 继续下一步
+                time.sleep(1)
+                continue
+            
+            # 确认识别率≥90%，执行点击
+            self.log(f"[确认] 识别率≥90%，执行点击")
             
             if self.smart_click(step_name):
-                self.log(f"等待 {wait_time} 秒...")
+                self.log(f"[成功] 点击完成")
+                self.log(f"[等待] {wait_time} 秒...")
                 time.sleep(wait_time)
             else:
-                self.log(f"步骤失败: {desc}")
-                # 继续执行下一步
+                self.log(f"[失败] 步骤失败: {desc}")
+                # 继续下一步
         
+        self.log("=" * 60)
         self.log("11步流程完成")
+        self.log("=" * 60)
 
 
 # 测试代码
@@ -332,6 +490,7 @@ if __name__ == '__main__':
     print(f"OpenCV可用: {OPENCV_AVAILABLE}")
     print(f"Android平台: {IS_ANDROID}")
     print(f"屏幕尺寸: {clicker.screen_width}x{clicker.screen_height}")
+    print(f"匹配阈值: {clicker.match_threshold * 100:.0f}% (确保识别率≥90%)")
     print("=" * 60)
     
     # 测试坐标适配
@@ -342,3 +501,28 @@ if __name__ == '__main__':
     print("\n按钮列表:")
     for name, button in clicker.buttons.items():
         print(f"  {name}: ({button['x']}, {button['y']}) - {button['desc']}")
+    
+    print("\n图片模板:")
+    for name, template in clicker.image_templates.items():
+        print(f"  {name}: {template}")
+    
+    print("\n文字模板:")
+    for name, template in clicker.text_templates.items():
+        print(f"  {name}: {template}")
+    
+    print("\n11步流程:")
+    steps = [
+        ("login", "登录", 3),
+        ("login_popup", "关闭弹窗", 2),
+        ("game_lobby", "游戏大厅", 2),
+        ("match_screen", "王者峡谷匹配", 2),
+        ("ai_mode_screen", "人机模式", 2),
+        ("start_game_screen", "开始游戏", 3),
+        ("prepare_screen", "准备游戏", 2),
+        ("ready_game", "准备进入游戏", 10),
+        ("game_over", "游戏结束", 60),
+        ("settlement_hero", "结算英雄", 2),
+        ("return_room", "返回房间", 3)
+    ]
+    for i, (step_name, desc, wait_time) in enumerate(steps, 1):
+        print(f"  {i}. {desc} ({step_name}) - 等待{wait_time}秒")
