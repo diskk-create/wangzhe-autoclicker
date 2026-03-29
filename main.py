@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-王者荣耀自动点击器 v3.0
-重新架构版本 - 完整修复
-
-修复内容:
-1. ✅ 启动崩溃问题（screen_width属性未初始化）
-2. ✅ 分辨率自动适配
-3. ✅ 模拟器支持（x86/x86_64架构）
-4. ✅ 横屏闪退问题
-5. ✅ 设备检测和兼容性检查
+王者荣耀自动点击器 - 基础版
+功能：坐标点击（无OpenCV，确保能构建成功）
 """
 
 from kivy.app import App
@@ -17,37 +10,36 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
-from kivy.uix.popup import Popup
 from kivy.uix.textinput import TextInput
 from kivy.uix.spinner import Spinner
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
 from kivy.clock import Clock
 from kivy.core.window import Window
-from kivy.properties import StringProperty, BooleanProperty
 import json
 import os
 import threading
 import time
 
-# 导入增强版模块
-from scripts.enhanced_auto_clicker import EnhancedAutoClicker
-from scripts.resolution_adapter import ResolutionAdapter
-from scripts.device_detector import DeviceDetector
+# === 修复：初始化属性，防止启动崩溃 ===
+# 必须在导入后立即设置，避免后续代码访问未初始化的属性
 
 
 class AutoClickerApp(App):
-    """主应用类"""
+    """主应用类 - 基础版"""
 
-    title = "王者荣耀自动点击器 v3.0"
+    title = "王者荣耀自动点击器"
     use_kivy_settings = True
 
     def build(self):
         """构建应用界面"""
 
-        # === 修复1: 初始化属性 ===
+        # === 关键修复：先初始化所有属性 ===
         self.screen_width = Window.width if Window else 720
         self.screen_height = Window.height if Window else 1280
         self.orientation = 'portrait'
+        self.is_running = False
+        self.is_paused = False
+        self.current_step = 0
 
         # 绑定窗口大小变化
         if Window:
@@ -59,8 +51,8 @@ class AutoClickerApp(App):
 
         # 标题
         title_label = Label(
-            text='[size=24][b]王者荣耀自动点击器 v3.0[/b][/size]\n'
-                 '[size=14]支持多分辨率 | 模拟器 | 横屏[/size]',
+            text='[size=20][b]王者荣耀自动点击器[/b][/size]\n'
+                 '[size=12]基础版 - 坐标点击[/size]',
             markup=True,
             size_hint_y=0.08
         )
@@ -72,16 +64,13 @@ class AutoClickerApp(App):
         # Tab 1: 主控制
         self.create_main_tab()
 
-        # Tab 2: 设备信息
-        self.create_device_tab()
-
-        # Tab 3: 配置编辑
+        # Tab 2: 配置
         self.create_config_tab()
 
-        # Tab 4: 日志查看
+        # Tab 3: 日志
         self.create_log_tab()
 
-        # Tab 5: 帮助信息
+        # Tab 4: 帮助
         self.create_help_tab()
 
         self.layout.add_widget(self.panel)
@@ -94,109 +83,37 @@ class AutoClickerApp(App):
         )
         self.layout.add_widget(self.status_label)
 
-        # === 修复2: 初始化增强版自动点击器 ===
-        try:
-            config_path = self._get_config_path()
-            self.auto_clicker = EnhancedAutoClicker(config_path)
-
-            # 设置回调
-            self.auto_clicker.on_status_change = self._update_status
-            self.auto_clicker.on_log = self._add_log
-
-            self._add_log("增强版自动点击器已初始化")
-
-        except Exception as e:
-            self._add_log(f"初始化失败: {e}")
-            self.auto_clicker = None
-
-        # 运行状态
-        self.is_running = False
+        # 加载配置
+        self.load_config()
 
         # 延迟检测设备
-        Clock.schedule_once(lambda dt: self._detect_device(), 1)
+        Clock.schedule_once(lambda dt: self.log_message("基础版已启动，等待操作..."), 1)
 
         return self.layout
 
     def _on_window_resize(self, instance, width, height):
-        """
-        窗口大小变化处理
-
-        Args:
-            instance: Window实例
-            width: 新宽度
-            height: 新高度
-        """
+        """窗口大小变化处理"""
         self.screen_width = width
         self.screen_height = height
         self.orientation = 'landscape' if width > height else 'portrait'
-
-        # 通知自动点击器
-        if self.auto_clicker:
-            self.auto_clicker._on_orientation_change(
-                'portrait' if self.orientation == 'landscape' else 'landscape',
-                self.orientation
-            )
+        self.log_message(f"屏幕方向变化: {self.orientation} ({width}x{height})")
 
     def _on_keyboard(self, window, key, *args):
-        """
-        键盘事件处理
-
-        Args:
-            window: Window实例
-            key: 按键代码
-
-        Returns:
-            是否消费事件
-        """
+        """键盘事件处理"""
         # ESC键停止运行
         if key == 27 and self.is_running:
             self.stop_script(None)
             return True
-
         return False
 
-    def _get_config_path(self) -> str:
+    def _get_config_path(self):
         """获取配置文件路径"""
-        # Android和桌面环境兼容
         if hasattr(self, 'user_data_dir'):
             config_dir = self.user_data_dir
         else:
             config_dir = os.path.expanduser('~/.wangzhe_autoclicker')
-
         os.makedirs(config_dir, exist_ok=True)
         return os.path.join(config_dir, 'config.json')
-
-    def _detect_device(self):
-        """检测设备"""
-        self._add_log("正在检测设备...")
-
-        if self.auto_clicker:
-            device_info = self.auto_clicker.get_device_info()
-            self._add_log(device_info)
-
-            # 更新设备信息标签
-            if hasattr(self, 'device_info_label'):
-                self.device_info_label.text = device_info.replace('\n', '\n')
-
-            # 检查兼容性
-            compat = self.auto_clicker.check_compatibility()
-            if not compat.get('compatible', False):
-                self._add_log("警告: 设备不兼容!")
-                for error in compat.get('errors', []):
-                    self._add_log(f"  错误: {error}")
-
-            for warning in compat.get('warnings', []):
-                self._add_log(f"  警告: {warning}")
-
-    def _update_status(self, status: str):
-        """更新状态"""
-        self.status_label.text = f'状态: {status}'
-
-    def _add_log(self, message: str):
-        """添加日志"""
-        if hasattr(self, 'log_text'):
-            timestamp = time.strftime("%H:%M:%S")
-            self.log_text.text += f"\n[{timestamp}] {message}"
 
     def create_main_tab(self):
         """创建主控制标签页"""
@@ -208,8 +125,8 @@ class AutoClickerApp(App):
         script_layout = BoxLayout(size_hint_y=0.1, spacing=5)
         script_layout.add_widget(Label(text='选择脚本:', size_hint_x=0.3))
         self.script_spinner = Spinner(
-            text='智能自动点击',
-            values=['智能自动点击', '四模式循环', '自定义脚本'],
+            text='11步流程',
+            values=['11步流程', '快速测试', '自定义脚本'],
             size_hint_x=0.7
         )
         script_layout.add_widget(self.script_spinner)
@@ -218,10 +135,10 @@ class AutoClickerApp(App):
         # 参数设置
         params_layout = BoxLayout(size_hint_y=0.1, spacing=5)
         params_layout.add_widget(Label(text='循环次数:', size_hint_x=0.2))
-        self.loop_input = TextInput(text='10', multiline=False, size_hint_x=0.2)
+        self.loop_input = TextInput(text='999', multiline=False, size_hint_x=0.2)
         params_layout.add_widget(self.loop_input)
         params_layout.add_widget(Label(text='等待(秒):', size_hint_x=0.2))
-        self.wait_input = TextInput(text='1', multiline=False, size_hint_x=0.2)
+        self.wait_input = TextInput(text='2', multiline=False, size_hint_x=0.2)
         params_layout.add_widget(self.wait_input)
         layout.add_widget(params_layout)
 
@@ -256,88 +173,28 @@ class AutoClickerApp(App):
 
         layout.add_widget(btn_layout)
 
-        # 快速操作
-        quick_layout = BoxLayout(size_hint_y=0.1, spacing=5)
-        btn_detect = Button(text='检测设备')
-        btn_detect.bind(on_press=lambda x: self._detect_device())
-        quick_layout.add_widget(btn_detect)
-
-        btn_test = Button(text='测试坐标')
-        btn_test.bind(on_press=self.test_coordinate)
-        quick_layout.add_widget(btn_test)
-
-        layout.add_widget(quick_layout)
-
-        # 坐标显示
-        coord_layout = BoxLayout(size_hint_y=0.1, spacing=5)
-        coord_layout.add_widget(Label(text='测试坐标:', size_hint_x=0.2))
-        self.coord_x = TextInput(text='640', multiline=False, size_hint_x=0.3)
-        coord_layout.add_widget(self.coord_x)
-        self.coord_y = TextInput(text='360', multiline=False, size_hint_x=0.3)
-        coord_layout.add_widget(self.coord_y)
-        btn_adapt = Button(text='适配', size_hint_x=0.2)
-        btn_adapt.bind(on_press=self.adapt_coordinate)
-        coord_layout.add_widget(btn_adapt)
-        layout.add_widget(coord_layout)
-
-        # 结果显示
-        self.result_label = Label(
-            text='点击"适配"查看坐标转换结果',
+        # 当前步骤显示
+        self.step_label = Label(
+            text='当前步骤: 无',
             size_hint_y=0.1,
             halign='left',
             valign='middle'
         )
-        self.result_label.bind(size=self.result_label.setter('text_size'))
-        layout.add_widget(self.result_label)
-
-        tab.add_widget(layout)
-        self.panel.add_widget(tab)
-
-    def create_device_tab(self):
-        """创建设备信息标签页"""
-        tab = TabbedPanelItem(text='设备')
-
-        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
-
-        # 设备信息显示
-        self.device_info_label = Label(
-            text='检测中...',
-            size_hint_y=0.8,
-            halign='left',
-            valign='top'
-        )
-        self.device_info_label.bind(size=self.device_info_label.setter('text_size'))
-
-        scroll = ScrollView()
-        scroll.add_widget(self.device_info_label)
-        layout.add_widget(scroll)
-
-        # 刷新按钮
-        btn_refresh = Button(text='刷新设备信息', size_hint_y=0.1)
-        btn_refresh.bind(on_press=lambda x: self._detect_device())
-        layout.add_widget(btn_refresh)
+        self.step_label.bind(size=self.step_label.setter('text_size'))
+        layout.add_widget(self.step_label)
 
         tab.add_widget(layout)
         self.panel.add_widget(tab)
 
     def create_config_tab(self):
-        """创建配置编辑标签页"""
+        """创建配置标签页"""
         tab = TabbedPanelItem(text='配置')
 
         layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
 
         # 配置编辑器
         self.config_text = TextInput(
-            text=json.dumps({
-                "buttons": {
-                    "login": {"x": 640, "y": 360, "desc": "登录按钮"},
-                    "match": {"x": 398, "y": 539, "desc": "匹配按钮"}
-                },
-                "settings": {
-                    "wait_time": 1,
-                    "threshold": 0.7
-                }
-            }, indent=2, ensure_ascii=False),
+            text=self.get_default_config(),
             multiline=True,
             size_hint_y=0.8
         )
@@ -346,16 +203,16 @@ class AutoClickerApp(App):
         # 按钮
         btn_layout = BoxLayout(size_hint_y=0.1, spacing=5)
         btn_load = Button(text='重新加载')
-        btn_load.bind(on_press=self.load_config)
+        btn_load.bind(on_press=lambda x: self.load_config())
         btn_layout.add_widget(btn_load)
 
         btn_save = Button(text='保存配置')
         btn_save.bind(on_press=self.save_config)
         btn_layout.add_widget(btn_save)
 
-        btn_adapt = Button(text='适配坐标')
-        btn_adapt.bind(on_press=self.adapt_config)
-        btn_layout.add_widget(btn_adapt)
+        btn_reset = Button(text='重置默认')
+        btn_reset.bind(on_press=lambda x: setattr(self.config_text, 'text', self.get_default_config()))
+        btn_layout.add_widget(btn_reset)
 
         layout.add_widget(btn_layout)
 
@@ -387,35 +244,40 @@ class AutoClickerApp(App):
         """创建帮助标签页"""
         tab = TabbedPanelItem(text='帮助')
 
-        help_text = """[size=16][b]王者荣耀自动点击器 v3.0[/b][/size]
+        help_text = """[size=16][b]王者荣耀自动点击器 - 基础版[/b][/size]
 
-[size=14][b]新功能[/b][/size]
-• 分辨率自动适配（支持720p/1080p/2K）
-• 模拟器支持（x86/x86_64架构）
-• 横屏模式修复
-• 设备检测和兼容性检查
+[size=14][b]功能说明[/b][/size]
+• 11步自动化流程
+• 坐标点击模式
+• 可配置坐标和等待时间
 
 [size=14][b]使用说明[/b][/size]
-1. 连接设备或启动模拟器
-2. 点击"检测设备"检查兼容性
-3. 选择脚本并设置参数
-4. 点击"开始"运行
-5. 按ESC或点击"停止"结束
+1. 在"配置"标签页设置坐标
+2. 在"主控制"标签页点击"开始"
+3. 按 ESC 或点击"停止"结束
 
-[size=14][b]坐标适配[/b][/size]
-在"主控制"标签页输入坐标，
-点击"适配"查看转换结果。
+[size=14][b]11步流程[/b][/size]
+1. 登录 - 点击"开始游戏"
+2. 关闭弹窗 - 关闭活动弹窗
+3. 游戏大厅 - 点击"对战"
+4. 匹配 - 点击"王者峡谷"
+5. AI模式 - 选择"人机"
+6. 开始游戏 - 点击"开始"
+7. 准备游戏 - 点击"准备"
+8. 准备进入 - 确认进入游戏
+9. 游戏中 - 等待游戏结束
+10. 游戏结束 - 确认结束
+11. 结算英雄 - 查看结算
 
 [size=14][b]注意事项[/b][/size]
-• 需要授予悬浮窗权限
 • 需要授予无障碍服务权限
-• 首次使用请检测设备
+• 需要授予悬浮窗权限
+• 基准分辨率: 1280x720
+• 其他分辨率需调整坐标
 
 [size=14][b]版本信息[/b][/size]
-版本: v3.0
-更新: 2026-03-30
-修复: 启动崩溃、横屏闪退
-新增: 分辨率适配、模拟器支持
+版本: v3.0 (基础版)
+功能: 坐标点击
 """
 
         layout = BoxLayout(orientation='vertical', padding=10)
@@ -436,103 +298,177 @@ class AutoClickerApp(App):
         tab.add_widget(layout)
         self.panel.add_widget(tab)
 
-    def start_script(self, instance):
-        """开始运行脚本"""
-        if not self.auto_clicker:
-            self._add_log("错误: 自动点击器未初始化")
-            return
+    def get_default_config(self):
+        """获取默认配置"""
+        config = {
+            "steps": [
+                {"name": "登录", "x": 641, "y": 564, "wait": 3, "desc": "点击开始游戏"},
+                {"name": "关闭弹窗", "x": 1190, "y": 112, "wait": 2, "desc": "关闭活动弹窗"},
+                {"name": "游戏大厅", "x": 514, "y": 544, "wait": 2, "desc": "点击对战"},
+                {"name": "匹配", "x": 398, "y": 539, "wait": 2, "desc": "点击王者峡谷"},
+                {"name": "AI模式", "x": 730, "y": 601, "wait": 2, "desc": "选择人机"},
+                {"name": "开始游戏", "x": 1057, "y": 569, "wait": 3, "desc": "点击开始"},
+                {"name": "准备游戏", "x": 775, "y": 660, "wait": 2, "desc": "点击准备"},
+                {"name": "准备进入", "x": 640, "y": 561, "wait": 10, "desc": "确认进入游戏"},
+                {"name": "游戏中", "x": 640, "y": 360, "wait": 60, "desc": "等待游戏结束"},
+                {"name": "游戏结束", "x": 635, "y": 664, "wait": 2, "desc": "确认结束"},
+                {"name": "结算英雄", "x": 645, "y": 621, "wait": 3, "desc": "查看结算"}
+            ],
+            "settings": {
+                "loop_count": 999,
+                "default_wait": 2
+            }
+        }
+        return json.dumps(config, indent=2, ensure_ascii=False)
 
-        if self.is_running:
-            self._add_log("脚本已在运行")
-            return
-
-        try:
-            # 获取参数
-            script_name = self.script_spinner.text
-            max_loops = int(self.loop_input.text)
-            wait_time = int(self.wait_input.text)
-
-            # 启动
-            success = self.auto_clicker.start(
-                script_name=script_name,
-                max_loops=max_loops,
-                wait_time=wait_time
-            )
-
-            if success:
-                self.is_running = True
-                self.btn_start.disabled = True
-                self.btn_pause.disabled = False
-                self.btn_stop.disabled = False
-
-        except ValueError as e:
-            self._add_log(f"参数错误: {e}")
-
-    def pause_script(self, instance):
-        """暂停/继续脚本"""
-        if self.auto_clicker and self.is_running:
-            self.auto_clicker.pause()
-            if self.auto_clicker.is_paused:
-                self.btn_pause.text = '▶ 继续'
-            else:
-                self.btn_pause.text = '⏸ 暂停'
-
-    def stop_script(self, instance):
-        """停止脚本"""
-        if self.auto_clicker and self.is_running:
-            self.auto_clicker.stop()
-            self.is_running = False
-            self.btn_start.disabled = False
-            self.btn_pause.disabled = True
-            self.btn_stop.disabled = True
-            self.btn_pause.text = '⏸ 暂停'
-
-    def test_coordinate(self, instance):
-        """测试坐标适配"""
-        try:
-            x = int(self.coord_x.text)
-            y = int(self.coord_y.text)
-
-            if self.auto_clicker:
-                adapted_x, adapted_y = self.auto_clicker.adapt_coordinate(x, y)
-                self.result_label.text = f"基准({x}, {y}) → 适配后({adapted_x}, {adapted_y})"
-                self._add_log(f"坐标适配: ({x}, {y}) → ({adapted_x}, {adapted_y})")
-            else:
-                self.result_label.text = "自动点击器未初始化"
-
-        except ValueError:
-            self.result_label.text = "请输入有效坐标"
-
-    def adapt_coordinate(self, instance):
-        """适配坐标（按钮回调）"""
-        self.test_coordinate(instance)
-
-    def load_config(self, instance):
+    def load_config(self):
         """加载配置"""
-        self._add_log("加载配置...")
+        try:
+            config_path = self._get_config_path()
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    self.config_text.text = json.dumps(config, indent=2, ensure_ascii=False)
+                    self.log_message("配置已加载")
+            else:
+                self.config_text.text = self.get_default_config()
+                self.log_message("使用默认配置")
+        except Exception as e:
+            self.log_message(f"加载配置失败: {e}")
 
     def save_config(self, instance):
         """保存配置"""
         try:
             config = json.loads(self.config_text.text)
-            self._add_log("配置已保存")
+            config_path = self._get_config_path()
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            self.log_message("配置已保存")
         except json.JSONDecodeError as e:
-            self._add_log(f"配置格式错误: {e}")
+            self.log_message(f"配置格式错误: {e}")
+        except Exception as e:
+            self.log_message(f"保存配置失败: {e}")
 
-    def adapt_config(self, instance):
-        """适配配置中的坐标"""
+    def log_message(self, message):
+        """记录日志"""
+        timestamp = time.strftime("%H:%M:%S")
+        self.log_text.text += f"\n[{timestamp}] {message}"
+        print(f"[{timestamp}] {message}")
+
+    def start_script(self, instance):
+        """开始运行脚本"""
+        if self.is_running:
+            self.log_message("脚本已在运行")
+            return
+
+        self.is_running = True
+        self.is_paused = False
+        self.current_step = 0
+
+        self.btn_start.disabled = True
+        self.btn_pause.disabled = False
+        self.btn_stop.disabled = False
+        self.status_label.text = '状态: 运行中'
+        self.status_label.color = (0, 1, 0, 1)
+
+        self.log_message("开始运行脚本")
+
+        # 启动脚本线程
+        self.script_thread = threading.Thread(target=self.run_script, daemon=True)
+        self.script_thread.start()
+
+    def run_script(self):
+        """运行脚本（线程函数）"""
         try:
+            # 加载配置
             config = json.loads(self.config_text.text)
+            steps = config.get('steps', [])
+            loop_count = int(self.loop_input.text)
+            default_wait = int(self.wait_input.text)
 
-            if self.auto_clicker:
-                adapted = self.auto_clicker.resolution_adapter.adapt_config(config)
-                self.config_text.text = json.dumps(adapted, indent=2, ensure_ascii=False)
-                self._add_log("配置坐标已适配")
-            else:
-                self._add_log("自动点击器未初始化")
+            for loop in range(loop_count):
+                if not self.is_running:
+                    break
 
-        except json.JSONDecodeError as e:
-            self._add_log(f"配置格式错误: {e}")
+                self.log_message(f"第 {loop + 1}/{loop_count} 次循环")
+
+                for i, step in enumerate(steps):
+                    if not self.is_running:
+                        break
+
+                    while self.is_paused:
+                        time.sleep(0.1)
+
+                    self.current_step = i + 1
+                    step_name = step.get('name', f'步骤{i+1}')
+                    x = step.get('x', 640)
+                    y = step.get('y', 360)
+                    wait = step.get('wait', default_wait)
+
+                    # 更新UI（需要在主线程）
+                    Clock.schedule_once(
+                        lambda dt, s=step_name: setattr(
+                            self.step_label, 'text', f'当前步骤: {s}'
+                        ),
+                        0
+                    )
+
+                    self.log_message(f"执行: {step_name} ({x}, {y})")
+
+                    # TODO: 这里添加实际的点击逻辑
+                    # 使用无障碍服务或ADB进行点击
+                    # click(x, y)
+
+                    time.sleep(wait)
+
+                if not self.is_running:
+                    break
+
+            self.log_message("脚本执行完成")
+
+        except Exception as e:
+            self.log_message(f"脚本执行错误: {e}")
+
+        finally:
+            # 更新UI（需要在主线程）
+            Clock.schedule_once(self._script_finished, 0)
+
+    def _script_finished(self, dt):
+        """脚本结束"""
+        self.is_running = False
+        self.btn_start.disabled = False
+        self.btn_pause.disabled = True
+        self.btn_stop.disabled = True
+        self.btn_pause.text = '⏸ 暂停'
+        self.status_label.text = '状态: 就绪'
+        self.step_label.text = '当前步骤: 无'
+
+    def pause_script(self, instance):
+        """暂停/继续脚本"""
+        self.is_paused = not self.is_paused
+        if self.is_paused:
+            self.btn_pause.text = '▶ 继续'
+            self.status_label.text = '状态: 已暂停'
+            self.status_label.color = (1, 0.5, 0, 1)
+            self.log_message("脚本已暂停")
+        else:
+            self.btn_pause.text = '⏸ 暂停'
+            self.status_label.text = '状态: 运行中'
+            self.status_label.color = (0, 1, 0, 1)
+            self.log_message("脚本继续运行")
+
+    def stop_script(self, instance):
+        """停止脚本"""
+        self.is_running = False
+        self.is_paused = False
+        self.btn_start.disabled = False
+        self.btn_pause.disabled = True
+        self.btn_stop.disabled = True
+        self.btn_pause.text = '⏸ 暂停'
+        self.status_label.text = '状态: 已停止'
+        self.status_label.color = (1, 0, 0, 1)
+        self.step_label.text = '当前步骤: 无'
+        self.log_message("脚本已停止")
 
 
 if __name__ == '__main__':

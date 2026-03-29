@@ -12,7 +12,7 @@ source.include_exts = py,png,jpg,kv,atlas,json,txt
 # 版本
 version = 3.0.0
 
-# 依赖（精简版，移除opencv和numpy）
+# 依赖（简化版，不包含OpenCV）
 requirements = python3,kivy,pyjnius
 
 # 屏幕方向（固定竖屏）
@@ -42,6 +42,12 @@ android.allow_backup = True
 
 # 日志过滤
 android.logcat_filters = *:S python:D
+
+# Android NDK 私有存储
+android.private_storage = True
+
+# 编译优化
+android.enable_androidx = True
 
 [buildozer]
 
