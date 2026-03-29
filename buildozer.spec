@@ -5,9 +5,10 @@ title = WangZheAutoClicker
 package.name = wangzheautoclicker
 package.domain = org.wangzhe
 
-# 源代码
+# 源代码（只包含main.py和assets）
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
+source.exclude_dirs = scripts,tests,docs
 
 # 版本
 version = 3.0.0
