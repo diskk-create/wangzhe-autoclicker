@@ -1,7 +1,7 @@
 [app]
 
 # 应用信息
-title = 王者荣耀自动点击器
+title = WangZheAutoClicker
 package.name = wangzheautoclicker
 package.domain = org.wangzhe
 
@@ -12,42 +12,26 @@ source.include_exts = py,png,jpg,kv,atlas,json,txt
 # 版本
 version = 3.0.0
 
-# 依赖（简化版，不包含OpenCV）
-requirements = python3,kivy,pyjnius
+# 依赖
+requirements = python3,kivy
 
-# 屏幕方向（固定竖屏）
+# 屏幕方向
 orientation = portrait
 fullscreen = 0
 
 # Android权限
-android.permissions = SYSTEM_ALERT_WINDOW,BIND_ACCESSIBILITY_SERVICE,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
+android.permissions = SYSTEM_ALERT_WINDOW
 
 # Android API
-android.api = 33
-android.minapi = 24
-android.ndk = 25b
+android.api = 31
+android.minapi = 21
 
 # SDK设置
 android.skip_update = False
 android.accept_sdk_license = True
 
-# 关键配置：防止Activity重建
-android.manifest_activity_attributes = android:configChanges="orientation|screenSize|keyboardHidden"
-
-# 多架构支持（ARM + x86）
-android.archs = armeabi-v7a,arm64-v8a,x86,x86_64
-
-# 允许备份
-android.allow_backup = True
-
-# 日志过滤
-android.logcat_filters = *:S python:D
-
-# Android NDK 私有存储
-android.private_storage = True
-
-# 编译优化
-android.enable_androidx = True
+# 架构
+android.archs = armeabi-v7a,arm64-v8a
 
 [buildozer]
 
