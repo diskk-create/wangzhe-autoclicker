@@ -413,8 +413,8 @@ class SimpleClicker:
 
         return result
 
-    def run_full_flow(self, callback=None):
-        """Run complete 11-step flow"""
+    def run_full_flow(self, callback=None, loop=True):
+        """Run complete flow in loop"""
         if self.is_running:
             print("Flow already running")
             return
@@ -423,23 +423,44 @@ class SimpleClicker:
         self.current_state = 'login'
 
         def run():
-            step = 0
-            while self.is_running and step < 11:
-                step += 1
-                result = self.run_flow_step()
+            loop_count = 0
+            while self.is_running:
+                loop_count += 1
+                print(f"\n{'='*50}")
+                print(f"LOOP #{loop_count}")
+                print(f"{'='*50}")
 
                 if callback:
-                    callback(f"Step {step}/11: {self.STATES[self.current_state]['name']}")
+                    callback(f"Loop #{loop_count}")
 
-                if not result:
-                    print(f"Flow stopped at step {step}")
+                step = 0
+                while self.is_running and step < 11:
+                    step += 1
+                    result = self.run_flow_step()
+
+                    if callback:
+                        callback(f"Loop {loop_count}, Step {step}/11: {self.STATES[self.current_state]['name']}")
+
+                    if not result:
+                        print(f"Flow stopped at step {step}")
+                        break
+
+                    time.sleep(2)  # Wait between steps
+
+                # Reset state for next loop
+                self.current_state = 'login'
+
+                if not loop:
                     break
 
-                time.sleep(2)  # Wait between steps
+                # Wait before starting next loop
+                if self.is_running:
+                    print(f"\nLoop {loop_count} completed. Waiting 3 seconds before next loop...")
+                    time.sleep(3)
 
             self.is_running = False
             if callback:
-                callback("Flow completed!")
+                callback("Flow stopped!")
 
         thread = threading.Thread(target=run)
         thread.daemon = True
@@ -467,7 +488,7 @@ class FloatingBoxLayout(BoxLayout):
 class WangZheApp(App):
     """WangZhe Auto Clicker - Floating Window"""
 
-    title = "WangZhe Auto Clicker v3.3.5"
+    title = "WangZhe Auto Clicker v3.3.6"
 
     def build(self):
         # Set window transparency and size
@@ -480,7 +501,7 @@ class WangZheApp(App):
 
         # Title
         title = Label(
-            text="WangZhe Clicker\nv3.3.5 - Fixed Screenshot",
+            text="WangZhe Clicker\nv3.3.6 - Loop Mode",
             size_hint_y=None,
             height=60,
             font_size='16sp',
