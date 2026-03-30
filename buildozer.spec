@@ -9,14 +9,17 @@ package.domain = org.wangzhe
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
 
+# 包含模板目录
+source.include_patterns = templates/*
+
 # 排除不需要的目录
-source.exclude_dirs = scripts,templates,configs
+source.exclude_dirs = scripts,configs
 
 # 版本
-version = 3.0.3
+version = 3.0.4
 
-# 依赖 - 只依赖python3,kivy,pyjnius，不依赖android模块
-requirements = python3,kivy,pyjnius
+# 依赖 - 包含OpenCV用于图像识别
+requirements = python3,kivy,pyjnius,opencv,numpy
 
 # 屏幕方向
 orientation = landscape
@@ -24,15 +27,15 @@ orientation = landscape
 # 全屏
 fullscreen = 0
 
-# Android权限 - 最小权限
-android.permissions = INTERNET
+# Android权限
+android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 
-# Android API - 使用稳定版本
+# Android API
 android.api = 33
 android.minapi = 24
 android.ndk = 25b
 
-# 架构 - 只构建ARM
+# 架构
 android.archs = arm64-v8a,armeabi-v7a
 
 # 接受许可证
