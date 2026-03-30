@@ -241,11 +241,14 @@ class SimpleClicker:
             from jnius import autoclass
             Runtime = autoclass('java.lang.Runtime')
             runtime = Runtime.getRuntime()
-            process = runtime.exec("su")
+            # Just check if su binary exists, don't wait for it
+            process = runtime.exec("which su")
             process.waitFor()
-            self.has_root = True
-            print("ROOT access available")
-        except:
+            exit_value = process.exitValue()
+            self.has_root = (exit_value == 0)
+            print(f"ROOT check: {'available' if self.has_root else 'not available'}")
+        except Exception as e:
+            print(f"ROOT check failed: {e}")
             self.has_root = False
             print("ROOT access not available")
 
@@ -448,7 +451,7 @@ class FloatingBoxLayout(BoxLayout):
 class WangZheApp(App):
     """WangZhe Auto Clicker - Floating Window"""
 
-    title = "WangZhe Auto Clicker v3.3.3"
+    title = "WangZhe Auto Clicker v3.3.4"
 
     def build(self):
         # Set window transparency and size
@@ -461,7 +464,7 @@ class WangZheApp(App):
 
         # Title
         title = Label(
-            text="WangZhe Clicker\nv3.3.3 - Debug",
+            text="WangZhe Clicker\nv3.3.4 - Fixed ROOT",
             size_hint_y=None,
             height=60,
             font_size='16sp',
