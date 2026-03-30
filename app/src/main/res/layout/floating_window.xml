@@ -53,6 +53,32 @@
             android:textColor="#00FF00"
             android:textSize="12sp" />
 
+        <!-- 当前步骤 -->
+        <TextView
+            android:id="@+id/tv_step"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:text="等待开始..."
+            android:textColor="#FFFF00"
+            android:textSize="11sp" />
+
+        <!-- 日志区域 -->
+        <TextView
+            android:id="@+id/tv_log"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_marginTop="4dp"
+            android:background="#222222"
+            android:gravity="start"
+            android:maxLines="5"
+            android:padding="4dp"
+            android:scrollbars="vertical"
+            android:text="日志:\n"
+            android:textColor="#AAAAAA"
+            android:textSize="9sp" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
@@ -91,6 +117,18 @@
             android:layout_marginTop="8dp"
             android:background="@drawable/btn_test"
             android:text="🔄 Test"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Image Recognition按钮 -->
+        <Button
+            android:id="@+id/btn_test_image"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_test"
+            android:text="🖼️ Test Image"
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:textStyle="bold" />

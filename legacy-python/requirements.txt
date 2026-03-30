@@ -1,0 +1,6 @@
+kivy>=2.2.0
+pyjnius>=1.5.0
+android
+numpy
+pillow
+opencv-python-headless
