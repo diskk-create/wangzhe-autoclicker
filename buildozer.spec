@@ -13,7 +13,7 @@ source.include_exts = py,png,jpg,kv,atlas,json,txt
 source.exclude_dirs = scripts,templates,configs
 
 # Version
-version = 3.0.5
+version = 3.0.6
 
 # Dependencies - Include Pyjnius for Android API
 requirements = python3,kivy,pyjnius

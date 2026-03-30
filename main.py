@@ -69,23 +69,54 @@ class SimpleClicker:
 
     def click(self, x, y):
         """Click screen"""
+        print(f"[CLICK] Attempting to click at ({x}, {y})")
+
         if not ANDROID_API_AVAILABLE:
-            print(f"[Test] Click: ({x}, {y})")
+            print(f"[CLICK] Test mode - Android API not available")
             return True
 
         try:
             from jnius import autoclass
             Runtime = autoclass('java.lang.Runtime')
+            TimeUnit = autoclass('java.util.concurrent.TimeUnit')
             runtime = Runtime.getRuntime()
 
+            # Try method 1: input tap (needs ROOT or shell permission)
             cmd = f"input tap {x} {y}"
+            print(f"[CLICK] Method 1: Executing shell command: {cmd}")
             process = runtime.exec(cmd)
-            process.waitFor()
+            process.waitFor(1, TimeUnit.SECONDS)
 
-            print(f"[Android] Click: ({x}, {y})")
-            return True
+            exit_code = process.exitValue()
+            print(f"[CLICK] Method 1 result: exit code = {exit_code}")
+
+            if exit_code == 0:
+                print(f"[CLICK] SUCCESS - Click executed via input tap")
+                return True
+            else:
+                print(f"[CLICK] Method 1 failed, exit code: {exit_code}")
+                print(f"[CLICK] Trying method 2...")
+
+                # Try method 2: su -c input tap (with ROOT)
+                cmd2 = f"su -c input tap {x} {y}"
+                print(f"[CLICK] Method 2: Executing with ROOT: {cmd2}")
+                process2 = runtime.exec(cmd2)
+                process2.waitFor(1, TimeUnit.SECONDS)
+
+                exit_code2 = process2.exitValue()
+                print(f"[CLICK] Method 2 result: exit code = {exit_code2}")
+
+                if exit_code2 == 0:
+                    print(f"[CLICK] SUCCESS - Click executed via ROOT")
+                    return True
+                else:
+                    print(f"[CLICK] Method 2 failed, exit code: {exit_code2}")
+                    return False
+
         except Exception as e:
-            print(f"Click failed: {e}")
+            print(f"[CLICK] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def get_screen_size(self):
@@ -96,7 +127,7 @@ class SimpleClicker:
 class WangZheApp(App):
     """WangZhe Auto Clicker"""
 
-    title = "WangZhe Auto Clicker v3.0.5"
+    title = "WangZhe Auto Clicker v3.0.6"
 
     def build(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
