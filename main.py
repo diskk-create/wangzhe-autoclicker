@@ -244,50 +244,40 @@ class SimpleClicker:
         """Request necessary permissions"""
         if not ANDROID_API_AVAILABLE:
             print("Permissions: Android API not available")
+            self.has_permissions = True
             return
 
         try:
-            print("Requesting permissions...")
+            print("Checking permissions...")
             from jnius import autoclass
 
             # Get Context
-            Context = autoclass('android.content.Context')
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
             activity = PythonActivity.mActivity
 
-            # Check and request permissions
-            if activity:
-                # Request storage permissions
-                if hasattr(activity, 'requestPermissions'):
-                    permissions = [
-                        'android.permission.READ_EXTERNAL_STORAGE',
-                        'android.permission.WRITE_EXTERNAL_STORAGE'
-                    ]
-                    activity.requestPermissions(permissions, 0)
-                    print("Storage permissions requested")
-
-                # Check SYSTEM_ALERT_WINDOW permission for floating window
+            # Check SYSTEM_ALERT_WINDOW permission for floating window
+            try:
                 Settings = autoclass('android.provider.Settings')
                 if hasattr(Settings, 'canDrawOverlays'):
                     can_draw = Settings.canDrawOverlays(activity)
                     print(f"Can draw overlays: {can_draw}")
                     if not can_draw:
-                        print("Need SYSTEM_ALERT_WINDOW permission")
-                        # Open settings for overlay permission
-                        Intent = autoclass('android.content.Intent')
-                        Uri = autoclass('android.net.Uri')
-                        intent = Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:" + activity.getPackageName())
-                        )
-                        activity.startActivity(intent)
-
+                        print("WARNING: Need SYSTEM_ALERT_WINDOW permission")
+                        print("Please enable overlay permission in settings")
+                        # Don't open settings automatically - it blocks the app
+                    else:
+                        self.has_permissions = True
+                        print("All permissions OK")
+                else:
+                    self.has_permissions = True
+                    print("Permissions check skipped (old Android version)")
+            except Exception as e:
+                print(f"Permission check error: {e}")
                 self.has_permissions = True
-                print("Permissions requested")
 
         except Exception as e:
             print(f"Permission request failed: {e}")
-            self.has_permissions = False
+            self.has_permissions = True
 
     def _init_matcher(self, dt):
         """Initialize image matcher"""
@@ -482,7 +472,7 @@ class FloatingBoxLayout(BoxLayout):
 class WangZheApp(App):
     """WangZhe Auto Clicker - Floating Window"""
 
-    title = "WangZhe Auto Clicker v3.3.0"
+    title = "WangZhe Auto Clicker v3.3.1"
 
     def build(self):
         # Set window transparency and size
@@ -495,7 +485,7 @@ class WangZheApp(App):
 
         # Title
         title = Label(
-            text="WangZhe Clicker\nv3.3.0 - Floating",
+            text="WangZhe Clicker\nv3.3.1 - Fixed",
             size_hint_y=None,
             height=60,
             font_size='16sp',
