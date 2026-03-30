@@ -199,25 +199,31 @@ class SimpleClicker:
             print("Initializing Android API...")
             from jnius import autoclass
             PYJNIUS_AVAILABLE = True
+            print("Pyjnius loaded successfully")
 
-            # Get activity
+            # Get activity with timeout
+            print("Getting PythonActivity...")
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
             mActivity = PythonActivity.mActivity
+            print(f"Activity: {mActivity}")
 
             # Get screen size
+            print("Getting screen size...")
             display = mActivity.getWindowManager().getDefaultDisplay()
             Point = autoclass('android.graphics.Point')()
             display.getSize(Point)
             self.screen_width = Point.x
             self.screen_height = Point.y
+            print(f"Screen size: {self.screen_width}x{self.screen_height}")
 
             # Check ROOT
+            print("Checking ROOT...")
             self._check_root()
 
             ANDROID_API_AVAILABLE = True
             self.is_initialized = True
 
-            print(f"Android initialized: {self.screen_width}x{self.screen_height}")
+            print(f"Android initialized successfully")
             print(f"ROOT access: {self.has_root}")
 
         except Exception as e:
@@ -227,6 +233,7 @@ class SimpleClicker:
             PYJNIUS_AVAILABLE = False
             ANDROID_API_AVAILABLE = False
             self.is_initialized = True
+            print("Continuing without Android API")
 
     def _check_root(self):
         """Check if device has ROOT access"""
@@ -441,7 +448,7 @@ class FloatingBoxLayout(BoxLayout):
 class WangZheApp(App):
     """WangZhe Auto Clicker - Floating Window"""
 
-    title = "WangZhe Auto Clicker v3.3.2"
+    title = "WangZhe Auto Clicker v3.3.3"
 
     def build(self):
         # Set window transparency and size
@@ -454,7 +461,7 @@ class WangZheApp(App):
 
         # Title
         title = Label(
-            text="WangZhe Clicker\nv3.3.2 - Fixed",
+            text="WangZhe Clicker\nv3.3.3 - Debug",
             size_hint_y=None,
             height=60,
             font_size='16sp',
