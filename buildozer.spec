@@ -9,14 +9,14 @@ package.domain = org.wangzhe
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
 
-# Exclude directories
-source.exclude_dirs = scripts,templates,configs
+# Include templates directory
+source.include_dirs = templates
 
 # Version
-version = 3.0.7
+version = 3.1.0
 
-# Dependencies - Include Pyjnius for Android API
-requirements = python3,kivy,pyjnius
+# Dependencies - Include OpenCV for image recognition
+requirements = python3,kivy,pyjnius,opencv,numpy
 
 # Screen orientation
 orientation = landscape

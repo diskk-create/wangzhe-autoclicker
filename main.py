@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-WangZhe Auto Clicker - Working Version
-With Android API (delayed initialization)
+WangZhe Auto Clicker - Complete Version
+With full 11-step flow and image recognition
 """
 
 from kivy.app import App
@@ -13,6 +13,7 @@ from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
 from kivy.clock import Clock
 import time
+import threading
 
 print("========================================")
 print("WangZhe Auto Clicker Starting")
@@ -22,19 +23,165 @@ print("========================================")
 PYJNIUS_AVAILABLE = False
 ANDROID_API_AVAILABLE = False
 mActivity = None
+CV_AVAILABLE = False
+
+# Try to load OpenCV
+try:
+    import cv2
+    import numpy as np
+    CV_AVAILABLE = True
+    print("OpenCV loaded successfully")
+except ImportError:
+    print("OpenCV not available, image recognition disabled")
+
+
+class ImageMatcher:
+    """Image matcher for template matching"""
+
+    def __init__(self, template_dir='templates', threshold=0.9):
+        self.template_dir = template_dir
+        self.threshold = threshold
+        self.cv_available = CV_AVAILABLE
+        self.button_templates = {}
+        self.text_templates = {}
+
+        if self.cv_available:
+            self._load_templates()
+
+    def _load_templates(self):
+        """Load template images"""
+        import os
+        if not os.path.exists(self.template_dir):
+            print(f"Template directory not found: {self.template_dir}")
+            return
+
+        print("Loading templates...")
+
+        # Button templates
+        button_files = {
+            'login_popup': 'template_login_popup.png',
+            'match_screen': 'template_match.png',
+            'start_game_screen': 'template_start_game.png',
+            'prepare_screen': 'template_prepare.png',
+            'ready_game': 'template_ready_game.png',
+            'game_over': 'template_game_over.png',
+        }
+
+        for name, filename in button_files.items():
+            path = os.path.join(self.template_dir, filename)
+            if os.path.exists(path):
+                template = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+                if template is not None:
+                    self.button_templates[name] = template
+                    print(f"Loaded button template: {name}")
+
+    def find_template(self, screenshot, template_key):
+        """Find template in screenshot"""
+        if not self.cv_available or screenshot is None:
+            return False, 0, 0, 0, 0, 0
+
+        if template_key not in self.button_templates:
+            return False, 0, 0, 0, 0, 0
+
+        try:
+            template = self.button_templates[template_key]
+            result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+
+            if max_val >= self.threshold:
+                h, w = template.shape
+                return True, max_loc[0], max_loc[1], w, h, max_val
+        except Exception as e:
+            print(f"Template matching error: {e}")
+
+        return False, 0, 0, 0, 0, 0
 
 
 class SimpleClicker:
     """Simple Clicker - With Android API"""
+
+    # 11-step flow
+    STATES = {
+        'login': {
+            'name': 'Login',
+            'desc': 'Click "Start Game"',
+            'next': 'login_popup',
+            'coords': (641, 564)
+        },
+        'login_popup': {
+            'name': 'Close Popup',
+            'desc': 'Close login popup',
+            'next': 'game_lobby',
+            'coords': (640, 360)
+        },
+        'game_lobby': {
+            'name': 'Game Lobby',
+            'desc': 'Click "Battle"',
+            'next': 'match_screen',
+            'coords': (1178, 567)
+        },
+        'match_screen': {
+            'name': 'Match Screen',
+            'desc': 'Click match button',
+            'next': 'ai_mode_screen',
+            'coords': (640, 600)
+        },
+        'ai_mode_screen': {
+            'name': 'AI Mode',
+            'desc': 'Select AI mode',
+            'next': 'start_game_screen',
+            'coords': (640, 360)
+        },
+        'start_game_screen': {
+            'name': 'Start Game',
+            'desc': 'Click start game',
+            'next': 'prepare_screen',
+            'coords': (1153, 575)
+        },
+        'prepare_screen': {
+            'name': 'Prepare',
+            'desc': 'Click prepare button',
+            'next': 'ready_game',
+            'coords': (1153, 575)
+        },
+        'ready_game': {
+            'name': 'Ready',
+            'desc': 'Click ready button',
+            'next': 'game_over',
+            'coords': (1153, 575)
+        },
+        'game_over': {
+            'name': 'Game Over',
+            'desc': 'Continue after game',
+            'next': 'settlement_hero',
+            'coords': (640, 360)
+        },
+        'settlement_hero': {
+            'name': 'Settlement',
+            'desc': 'Click continue',
+            'next': 'return_room',
+            'coords': (640, 680)
+        },
+        'return_room': {
+            'name': 'Return Room',
+            'desc': 'Return to room',
+            'next': 'game_lobby',
+            'coords': (640, 680)
+        }
+    }
 
     def __init__(self):
         self.is_initialized = False
         self.screen_width = 1280
         self.screen_height = 720
         self.has_root = False
+        self.matcher = None
+        self.current_state = 'login'
+        self.is_running = False
 
         # Delay initialization
         Clock.schedule_once(self._init_android, 0.5)
+        Clock.schedule_once(self._init_matcher, 1.0)
 
     def _init_android(self, dt):
         """Initialize Android (delayed)"""
@@ -65,7 +212,16 @@ class SimpleClicker:
             print(f"Android init failed: {e}")
             PYJNIUS_AVAILABLE = False
             ANDROID_API_AVAILABLE = False
-            self.is_initialized = True  # Still mark as initialized for test mode
+            self.is_initialized = True
+
+    def _init_matcher(self, dt):
+        """Initialize image matcher"""
+        try:
+            self.matcher = ImageMatcher(threshold=0.9)
+            print(f"Image matcher initialized: CV={CV_AVAILABLE}")
+        except Exception as e:
+            print(f"Image matcher init failed: {e}")
+            self.matcher = None
 
     def click(self, x, y):
         """Click screen"""
@@ -81,9 +237,9 @@ class SimpleClicker:
             TimeUnit = autoclass('java.util.concurrent.TimeUnit')
             runtime = Runtime.getRuntime()
 
-            # Try method 1: input tap (needs ROOT or shell permission)
+            # Method 1: input tap
             cmd = f"input tap {x} {y}"
-            print(f"[CLICK] Method 1: Executing shell command: {cmd}")
+            print(f"[CLICK] Method 1: {cmd}")
             process = runtime.exec(cmd)
             process.waitFor(1, TimeUnit.SECONDS)
 
@@ -91,15 +247,12 @@ class SimpleClicker:
             print(f"[CLICK] Method 1 result: exit code = {exit_code}")
 
             if exit_code == 0:
-                print(f"[CLICK] SUCCESS - Click executed via input tap")
+                print(f"[CLICK] SUCCESS")
                 return True
             else:
-                print(f"[CLICK] Method 1 failed, exit code: {exit_code}")
-                print(f"[CLICK] Trying method 2...")
-
-                # Try method 2: su -c input tap (with ROOT)
+                # Method 2: su -c input tap
                 cmd2 = f"su -c input tap {x} {y}"
-                print(f"[CLICK] Method 2: Executing with ROOT: {cmd2}")
+                print(f"[CLICK] Method 2: {cmd2}")
                 process2 = runtime.exec(cmd2)
                 process2.waitFor(1, TimeUnit.SECONDS)
 
@@ -107,34 +260,93 @@ class SimpleClicker:
                 print(f"[CLICK] Method 2 result: exit code = {exit_code2}")
 
                 if exit_code2 == 0:
-                    print(f"[CLICK] SUCCESS - Click executed via ROOT")
+                    print(f"[CLICK] SUCCESS")
                     return True
                 else:
-                    print(f"[CLICK] Method 2 failed, exit code: {exit_code2}")
+                    print(f"[CLICK] FAILED")
                     return False
 
         except Exception as e:
             print(f"[CLICK] ERROR: {e}")
-            import traceback
-            traceback.print_exc()
             return False
 
     def get_screen_size(self):
         """Get screen size"""
         return self.screen_width, self.screen_height
 
+    def run_flow_step(self, state_name=None):
+        """Run one step of the flow"""
+        if state_name is None:
+            state_name = self.current_state
+
+        if state_name not in self.STATES:
+            print(f"Unknown state: {state_name}")
+            return False
+
+        state = self.STATES[state_name]
+        print(f"\n[STEP] {state['name']}: {state['desc']}")
+
+        # Get click coordinates
+        x, y = state['coords']
+
+        # Scale coordinates to screen size
+        scale_x = self.screen_width / 1280
+        scale_y = self.screen_height / 720
+        scaled_x = int(x * scale_x)
+        scaled_y = int(y * scale_y)
+
+        print(f"[STEP] Clicking at ({scaled_x}, {scaled_y})")
+        result = self.click(scaled_x, scaled_y)
+
+        # Move to next state
+        self.current_state = state['next']
+
+        return result
+
+    def run_full_flow(self, callback=None):
+        """Run complete 11-step flow"""
+        if self.is_running:
+            print("Flow already running")
+            return
+
+        self.is_running = True
+        self.current_state = 'login'
+
+        def run():
+            step = 0
+            while self.is_running and step < 11:
+                step += 1
+                result = self.run_flow_step()
+
+                if callback:
+                    callback(f"Step {step}/11: {self.STATES[self.current_state]['name']}")
+
+                if not result:
+                    print(f"Flow stopped at step {step}")
+                    break
+
+                time.sleep(2)  # Wait between steps
+
+            self.is_running = False
+            if callback:
+                callback("Flow completed!")
+
+        thread = threading.Thread(target=run)
+        thread.daemon = True
+        thread.start()
+
 
 class WangZheApp(App):
     """WangZhe Auto Clicker"""
 
-    title = "WangZhe Auto Clicker v3.0.7"
+    title = "WangZhe Auto Clicker v3.1.0"
 
     def build(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
 
         # Title
         title = Label(
-            text="WangZhe Auto Clicker\nv3.0.7",
+            text="WangZhe Auto Clicker\nv3.1.0 - Full Flow",
             size_hint_y=None,
             height=100,
             font_size='22sp',
@@ -146,8 +358,8 @@ class WangZheApp(App):
         self.status = Label(
             text="Status: Initializing...",
             size_hint_y=None,
-            height=100,
-            font_size='16sp'
+            height=80,
+            font_size='14sp'
         )
         layout.add_widget(self.status)
 
@@ -157,18 +369,30 @@ class WangZheApp(App):
         # Initialize clicker
         self.clicker = SimpleClicker()
 
-        # Update status after 1 second
-        Clock.schedule_once(self._update_status, 1.0)
+        # Update status after 1.5 seconds
+        Clock.schedule_once(self._update_status, 1.5)
 
         # Scroll area
         scroll = ScrollView()
         btns = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
         btns.bind(minimum_height=btns.setter('height'))
 
+        # Run full flow button
+        flow_btn = Button(text="Run Full Flow (11 Steps)", size_hint_y=None, height=70)
+        flow_btn.bind(on_press=self._run_flow)
+        btns.add_widget(flow_btn)
+
         # Test click button
         test_btn = Button(text="Test Click (Screen Center)", size_hint_y=None, height=70)
         test_btn.bind(on_press=self._test_click)
         btns.add_widget(test_btn)
+
+        # Step buttons
+        for state_name in ['login', 'game_lobby', 'match_screen', 'start_game_screen']:
+            state = SimpleClicker.STATES[state_name]
+            btn = Button(text=f"{state['name']}: {state['desc']}", size_hint_y=None, height=60)
+            btn.bind(on_press=lambda instance, s=state_name: self._run_step(s))
+            btns.add_widget(btn)
 
         # Refresh status
         refresh_btn = Button(text="Refresh Status", size_hint_y=None, height=70)
@@ -185,9 +409,21 @@ class WangZheApp(App):
         """Update status"""
         if self.clicker.is_initialized and ANDROID_API_AVAILABLE:
             w, h = self.clicker.get_screen_size()
-            self.status.text = f"Status: OK\nScreen: {w}x{h}"
+            cv_status = "CV OK" if CV_AVAILABLE else "CV N/A"
+            self.status.text = f"Status: OK\nScreen: {w}x{h}\n{cv_status}"
         else:
             self.status.text = "Status: Test Mode\nScreen: 1280x720"
+
+    def _run_flow(self, instance):
+        """Run full flow"""
+        print(f"[BUTTON] Run Full Flow button pressed")
+        self.status.text = "Running full flow..."
+        self.clicker.run_full_flow(callback=self._update_flow_status)
+
+    def _update_flow_status(self, message):
+        """Update flow status"""
+        from kivy.clock import Clock
+        Clock.schedule_once(lambda dt: setattr(self.status, 'text', message), 0)
 
     def _test_click(self, instance):
         """Test click"""
@@ -197,6 +433,12 @@ class WangZheApp(App):
         self.clicker.click(640, 360)
         self.status.text = f"Clicked: (640, 360)\nCount: {self.click_count}"
         print(f"[BUTTON] Click function returned")
+
+    def _run_step(self, state_name):
+        """Run single step"""
+        print(f"[BUTTON] Run step: {state_name}")
+        self.clicker.run_flow_step(state_name)
+        self.status.text = f"Step: {SimpleClicker.STATES[state_name]['name']}"
 
     def _refresh(self, instance):
         """Refresh"""
