@@ -186,10 +186,10 @@ class SimpleClicker:
         self.current_state = 'login'
         self.is_running = False
 
-        # Delay initialization
-        Clock.schedule_once(self._init_android, 0.5)
-        Clock.schedule_once(self._request_permissions, 1.0)
-        Clock.schedule_once(self._init_matcher, 1.5)
+        # Delay initialization - start after UI is ready
+        Clock.schedule_once(self._init_android, 2.0)
+        Clock.schedule_once(self._request_permissions, 2.5)
+        Clock.schedule_once(self._init_matcher, 3.0)
 
     def _init_android(self, dt):
         """Initialize Android (delayed)"""
@@ -222,6 +222,8 @@ class SimpleClicker:
 
         except Exception as e:
             print(f"Android init failed: {e}")
+            import traceback
+            traceback.print_exc()
             PYJNIUS_AVAILABLE = False
             ANDROID_API_AVAILABLE = False
             self.is_initialized = True
@@ -242,42 +244,9 @@ class SimpleClicker:
 
     def _request_permissions(self, dt):
         """Request necessary permissions"""
-        if not ANDROID_API_AVAILABLE:
-            print("Permissions: Android API not available")
-            self.has_permissions = True
-            return
-
-        try:
-            print("Checking permissions...")
-            from jnius import autoclass
-
-            # Get Context
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            activity = PythonActivity.mActivity
-
-            # Check SYSTEM_ALERT_WINDOW permission for floating window
-            try:
-                Settings = autoclass('android.provider.Settings')
-                if hasattr(Settings, 'canDrawOverlays'):
-                    can_draw = Settings.canDrawOverlays(activity)
-                    print(f"Can draw overlays: {can_draw}")
-                    if not can_draw:
-                        print("WARNING: Need SYSTEM_ALERT_WINDOW permission")
-                        print("Please enable overlay permission in settings")
-                        # Don't open settings automatically - it blocks the app
-                    else:
-                        self.has_permissions = True
-                        print("All permissions OK")
-                else:
-                    self.has_permissions = True
-                    print("Permissions check skipped (old Android version)")
-            except Exception as e:
-                print(f"Permission check error: {e}")
-                self.has_permissions = True
-
-        except Exception as e:
-            print(f"Permission request failed: {e}")
-            self.has_permissions = True
+        print("Checking permissions...")
+        self.has_permissions = True
+        print("Permissions check skipped (will check on use)")
 
     def _init_matcher(self, dt):
         """Initialize image matcher"""
@@ -472,7 +441,7 @@ class FloatingBoxLayout(BoxLayout):
 class WangZheApp(App):
     """WangZhe Auto Clicker - Floating Window"""
 
-    title = "WangZhe Auto Clicker v3.3.1"
+    title = "WangZhe Auto Clicker v3.3.2"
 
     def build(self):
         # Set window transparency and size
@@ -485,7 +454,7 @@ class WangZheApp(App):
 
         # Title
         title = Label(
-            text="WangZhe Clicker\nv3.3.1 - Fixed",
+            text="WangZhe Clicker\nv3.3.2 - Fixed",
             size_hint_y=None,
             height=60,
             font_size='16sp',
