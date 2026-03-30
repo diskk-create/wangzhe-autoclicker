@@ -1,7 +1,7 @@
 [app]
 
 # 应用信息
-title = WangZheAutoClicker Test
+title = WangZheAutoClicker
 package.name = wangzheautoclicker
 package.domain = org.wangzhe
 
@@ -9,14 +9,14 @@ package.domain = org.wangzhe
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
 
-# 排除所有目录
+# 排除不需要的目录
 source.exclude_dirs = scripts,templates,configs
 
 # 版本
-version = 3.2.0
+version = 3.0.3
 
-# 最小依赖 - 只需要Kivy
-requirements = python3,kivy
+# 依赖 - 只依赖python3,kivy,pyjnius，不依赖android模块
+requirements = python3,kivy,pyjnius
 
 # 屏幕方向
 orientation = landscape
@@ -27,12 +27,12 @@ fullscreen = 0
 # Android权限 - 最小权限
 android.permissions = INTERNET
 
-# Android API
+# Android API - 使用稳定版本
 android.api = 33
 android.minapi = 24
 android.ndk = 25b
 
-# 架构
+# 架构 - 只构建ARM
 android.archs = arm64-v8a,armeabi-v7a
 
 # 接受许可证
