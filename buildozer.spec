@@ -1,7 +1,7 @@
 [app]
 
 # 应用信息
-title = WangZheAutoClicker
+title = WangZheAutoClicker Test
 package.name = wangzheautoclicker
 package.domain = org.wangzhe
 
@@ -9,17 +9,14 @@ package.domain = org.wangzhe
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
 
-# 包含模板目录
-source.include_patterns = templates/*
-
-# 排除不需要的目录
-source.exclude_dirs = scripts,configs
+# 排除所有目录
+source.exclude_dirs = scripts,templates,configs
 
 # 版本
-version = 3.1.1
+version = 3.2.0
 
-# 依赖 - 包含OpenCV用于图像识别
-requirements = python3,kivy,pyjnius,opencv,numpy
+# 最小依赖 - 只需要Kivy
+requirements = python3,kivy
 
 # 屏幕方向
 orientation = landscape
@@ -27,8 +24,8 @@ orientation = landscape
 # 全屏
 fullscreen = 0
 
-# Android权限
-android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+# Android权限 - 最小权限
+android.permissions = INTERNET
 
 # Android API
 android.api = 33
