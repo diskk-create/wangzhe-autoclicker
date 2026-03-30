@@ -1,30 +1,30 @@
 [app]
 
-# 应用信息
-title = WangZheAutoClicker Test
+# App info
+title = WangZheAutoClicker
 package.name = wangzheautoclicker
 package.domain = org.wangzhe
 
-# 源代码
+# Source
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
 
-# 排除所有目录
+# Exclude directories
 source.exclude_dirs = scripts,templates,configs
 
-# 版本
-version = 3.0.3
+# Version
+version = 3.0.5
 
-# 最小依赖 - 只需要Kivy，不包含Pyjnius
-requirements = python3,kivy
+# Dependencies - Include Pyjnius for Android API
+requirements = python3,kivy,pyjnius
 
-# 屏幕方向
+# Screen orientation
 orientation = landscape
 
-# 全屏
+# Fullscreen
 fullscreen = 0
 
-# Android权限 - 最小权限
+# Android permissions
 android.permissions = INTERNET
 
 # Android API
@@ -32,19 +32,19 @@ android.api = 33
 android.minapi = 24
 android.ndk = 25b
 
-# 架构
+# Architectures
 android.archs = arm64-v8a,armeabi-v7a
 
-# 接受许可证
+# Accept license
 android.accept_sdk_license = True
 
-# 允许备份
+# Allow backup
 android.allow_backup = True
 
 [buildozer]
 
-# 日志级别
+# Log level
 log_level = 2
 
-# 警告root用户
+# Warn on root
 warn_on_root = 1
