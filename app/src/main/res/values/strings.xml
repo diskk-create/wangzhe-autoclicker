@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WangZhe Auto Clicker</string>
+    <string name="accessibility_service_description">自动点击服务，用于在没有ROOT权限的情况下执行点击操作。</string>
+</resources>

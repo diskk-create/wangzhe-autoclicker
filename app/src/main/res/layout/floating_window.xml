@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- 收起状态 - 悬浮球 -->
+    <ImageView
+        android:id="@+id/collapsed_view"
+        android:layout_width="70dp"
+        android:layout_height="70dp"
+        android:background="@drawable/floating_ball_bg"
+        android:contentDescription="Floating Ball"
+        android:padding="15dp"
+        android:src="@drawable/ic_play"
+        android:visibility="visible" />
+
+    <!-- 展开状态 - 菜单面板 -->
+    <LinearLayout
+        android:id="@+id/expanded_view"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/menu_bg"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <!-- 标题 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="WangZhe Clicker"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="v1.0.0"
+            android:textColor="#AAAAAA"
+            android:textSize="11sp" />
+
+        <!-- 状态 -->
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="● Ready"
+            android:textColor="#00FF00"
+            android:textSize="12sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:background="#333333" />
+
+        <!-- Start按钮 -->
+        <Button
+            android:id="@+id/btn_start"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_start"
+            android:text="▶ Start"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Stop按钮 -->
+        <Button
+            android:id="@+id/btn_stop"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_stop"
+            android:text="⏸ Stop"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Test按钮 -->
+        <Button
+            android:id="@+id/btn_test"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_test"
+            android:text="🔄 Test"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Close按钮 -->
+        <Button
+            android:id="@+id/btn_close"
+            android:layout_width="match_parent"
+            android:layout_height="35dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_close"
+            android:text="✕ Close"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp" />
+
+        <!-- Exit按钮 -->
+        <Button
+            android:id="@+id/btn_exit"
+            android:layout_width="match_parent"
+            android:layout_height="35dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/btn_exit"
+            android:text="Exit App"
+            android:textColor="#FF6666"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+</FrameLayout>
