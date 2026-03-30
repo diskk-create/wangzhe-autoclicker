@@ -127,14 +127,14 @@ class SimpleClicker:
 class WangZheApp(App):
     """WangZhe Auto Clicker"""
 
-    title = "WangZhe Auto Clicker v3.0.6"
+    title = "WangZhe Auto Clicker v3.0.7"
 
     def build(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
 
         # Title
         title = Label(
-            text="WangZhe Auto Clicker\nv3.0.5",
+            text="WangZhe Auto Clicker\nv3.0.7",
             size_hint_y=None,
             height=100,
             font_size='22sp',
@@ -150,6 +150,9 @@ class WangZheApp(App):
             font_size='16sp'
         )
         layout.add_widget(self.status)
+
+        # Click counter
+        self.click_count = 0
 
         # Initialize clicker
         self.clicker = SimpleClicker()
@@ -188,8 +191,12 @@ class WangZheApp(App):
 
     def _test_click(self, instance):
         """Test click"""
+        self.click_count += 1
+        print(f"[BUTTON] Test Click button pressed (count: {self.click_count})")
+        print(f"[BUTTON] Calling clicker.click(640, 360)")
         self.clicker.click(640, 360)
-        self.status.text = "Clicked: (640, 360)"
+        self.status.text = f"Clicked: (640, 360)\nCount: {self.click_count}"
+        print(f"[BUTTON] Click function returned")
 
     def _refresh(self, instance):
         """Refresh"""
