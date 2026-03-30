@@ -9,14 +9,17 @@ package.domain = org.wangzhe
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
 
+# 包含模板目录
+source.include_patterns = templates/*
+
 # 排除不需要的目录
-source.exclude_dirs = scripts,templates,configs
+source.exclude_dirs = scripts,configs
 
 # 版本
-version = 3.1.0
+version = 3.1.1
 
-# 依赖 - 最小依赖，确保稳定启动
-requirements = python3,kivy,pyjnius
+# 依赖 - 包含OpenCV用于图像识别
+requirements = python3,kivy,pyjnius,opencv,numpy
 
 # 屏幕方向
 orientation = landscape
@@ -25,7 +28,7 @@ orientation = landscape
 fullscreen = 0
 
 # Android权限
-android.permissions = INTERNET
+android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 
 # Android API
 android.api = 33
