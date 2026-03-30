@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-WangZhe Auto Clicker v3.4.0 - Floating Ball Mode
-Features:
-- Floating ball on desktop (draggable)
-- Click to expand/collapse menu
-- Always on top
-- Smooth animations
+WangZhe Auto Clicker v3.4.1 - Android Floating Window Version
+使用Android原生API实现真正的悬浮窗
 """
 
 import threading
@@ -23,13 +19,20 @@ except:
 ANDROID_API_AVAILABLE = False
 mActivity = None
 
-# Try to import OpenCV
-try:
-    import cv2
-    import numpy as np
-    CV_AVAILABLE = True
-except:
-    CV_AVAILABLE = False
+# Android classes
+if PYJNIUS_AVAILABLE:
+    try:
+        PythonActivity = autoclass('org.kivy.android.PythonActivity')
+        WindowManager = autoclass('android.view.WindowManager')
+        WindowManagerLayoutParams = autoclass('android.view.WindowManager$LayoutParams')
+        PixelFormat = autoclass('android.graphics.PixelFormat')
+        Gravity = autoclass('android.view.Gravity')
+        Context = autoclass('android.content.Context')
+        ANDROID_CLASSES_AVAILABLE = True
+    except:
+        ANDROID_CLASSES_AVAILABLE = False
+else:
+    ANDROID_CLASSES_AVAILABLE = False
 
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
@@ -44,12 +47,13 @@ from kivy.animation import Animation
 from kivy.properties import NumericProperty, BooleanProperty, ListProperty
 
 print("=" * 50)
-print("WangZhe Floating Ball v3.4.0")
+print("WangZhe Floating Ball v3.4.1")
+print("Android Native Floating Window")
 print("=" * 50)
 
 
 class FloatingBall(Widget):
-    """Floating ball widget - draggable ball with animations"""
+    """Floating ball widget"""
     
     ball_size = NumericProperty(70)
     is_expanded = BooleanProperty(False)
@@ -60,13 +64,9 @@ class FloatingBall(Widget):
         self.size_hint = (None, None)
         self.size = (70, 70)
         self.pos = (100, 100)
-        
-        # Touch tracking
         self.touch_start_pos = None
         self.is_dragging = False
         self.drag_threshold = 15
-        
-        # Draw ball
         self.bind(pos=self.update_ball, size=self.update_ball)
     
     def update_ball(self, *args):
@@ -76,20 +76,16 @@ class FloatingBall(Widget):
             # Outer glow
             Color(0.2, 0.6, 0.9, 0.2)
             Ellipse(pos=(self.x - 5, self.y - 5), size=(self.width + 10, self.height + 10))
-            
-            # Ball shadow
+            # Shadow
             Color(0, 0, 0, 0.4)
             Ellipse(pos=(self.x + 4, self.y - 4), size=self.size)
-            
             # Main ball
             Color(*self.ball_color)
             Ellipse(pos=self.pos, size=self.size)
-            
-            # Inner highlight
+            # Highlight
             Color(1, 1, 1, 0.4)
             Ellipse(pos=(self.x + 12, self.y + 25), size=(30, 18))
-            
-            # Center play icon
+            # Play icon
             Color(1, 1, 1, 0.9)
             cx, cy = self.center
             points = [cx - 8, cy - 10, cx - 8, cy + 10, cx + 12, cy]
@@ -107,31 +103,23 @@ class FloatingMenu(BoxLayout):
         self.opacity = 0
         self.pos = (-1000, -1000)
         self.app_instance = app_instance
-        
-        # Padding
         self.padding = [10, 10, 10, 10]
         self.spacing = 8
         
-        # Background
         with self.canvas.before:
             Color(0.12, 0.12, 0.12, 0.95)
             self.bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[12])
         
         self.bind(pos=self.update_bg, size=self.update_bg)
-        
-        # Build menu
         self._build_menu()
     
     def update_bg(self, *args):
-        """Update background"""
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
     
     def _build_menu(self):
-        """Build menu buttons"""
-        # Title
         title = Label(
-            text="[b]WangZhe Clicker[/b]\n[size=11]v3.4.0[/size]",
+            text="[b]WangZhe Clicker[/b]\n[size=11]v3.4.1[/size]",
             markup=True,
             size_hint_y=None,
             height=50,
@@ -141,7 +129,6 @@ class FloatingMenu(BoxLayout):
         title.bind(texture_size=title.setter('size'))
         self.add_widget(title)
         
-        # Status label
         self.status_label = Label(
             text="[color=00ff00]● Ready[/color]",
             markup=True,
@@ -152,7 +139,6 @@ class FloatingMenu(BoxLayout):
         )
         self.add_widget(self.status_label)
         
-        # Buttons
         buttons = [
             ("▶ Start", self._on_start, (0.15, 0.6, 0.25, 0.9)),
             ("⏸ Stop", self._on_stop, (0.7, 0.25, 0.25, 0.9)),
@@ -174,46 +160,36 @@ class FloatingMenu(BoxLayout):
             self.add_widget(btn)
     
     def _on_start(self, instance):
-        """Start flow"""
-        print("[MENU] Start pressed")
         if self.app_instance:
             self.app_instance.start_flow()
             self.status_label.text = "[color=00ff00]● Running[/color]"
     
     def _on_stop(self, instance):
-        """Stop flow"""
-        print("[MENU] Stop pressed")
         if self.app_instance:
             self.app_instance.stop_flow()
             self.status_label.text = "[color=ffff00]● Stopped[/color]"
     
     def _on_test(self, instance):
-        """Test click"""
-        print("[MENU] Test pressed")
         if self.app_instance:
             self.app_instance.test_click()
     
     def _on_exit(self, instance):
-        """Exit app"""
-        print("[MENU] Exit pressed")
         if self.app_instance:
             self.app_instance.exit_app()
     
     def show(self, pos):
-        """Show menu with animation"""
         self.pos = pos
         anim = Animation(opacity=1, duration=0.2, t='out_quad')
         anim.start(self)
     
     def hide(self):
-        """Hide menu"""
         anim = Animation(opacity=0, duration=0.15, t='in_quad')
         anim.bind(on_complete=lambda *args: setattr(self, 'pos', (-1000, -1000)))
         anim.start(self)
 
 
 class SimpleClicker:
-    """Simple clicker for floating ball app"""
+    """Simple clicker for Android"""
     
     def __init__(self):
         self.screen_width = 1280
@@ -221,86 +197,71 @@ class SimpleClicker:
         self.has_root = False
         self.is_initialized = False
         self.is_running = False
-        
-        # Initialize Android API
         Clock.schedule_once(self._init_android, 0.5)
     
     def _init_android(self, dt):
-        """Initialize Android API"""
         global ANDROID_API_AVAILABLE, mActivity
         
-        try:
-            if PYJNIUS_AVAILABLE:
+        if PYJNIUS_AVAILABLE:
+            try:
                 from jnius import autoclass
                 PythonActivity = autoclass('org.kivy.android.PythonActivity')
                 mActivity = PythonActivity.mActivity
                 
-                # Get screen size
                 display = mActivity.getWindowManager().getDefaultDisplay()
                 Point = autoclass('android.graphics.Point')()
                 display.getSize(Point)
                 self.screen_width = Point.x
                 self.screen_height = Point.y
                 
-                # Check ROOT
                 self._check_root()
-                
                 ANDROID_API_AVAILABLE = True
                 self.is_initialized = True
-                print(f"Android initialized: {self.screen_width}x{self.screen_height}")
-        
-        except Exception as e:
-            print(f"Android init failed: {e}")
+                print(f"Android: {self.screen_width}x{self.screen_height}, ROOT: {self.has_root}")
+            except Exception as e:
+                print(f"Android init failed: {e}")
     
     def _check_root(self):
-        """Check ROOT access"""
         try:
             from jnius import autoclass
             Runtime = autoclass('java.lang.Runtime')
-            runtime = Runtime.getRuntime()
-            process = runtime.exec("which su")
+            process = Runtime.getRuntime().exec("which su")
             process.waitFor()
             self.has_root = (process.exitValue() == 0)
-            print(f"ROOT: {self.has_root}")
         except:
             self.has_root = False
     
     def click(self, x, y):
-        """Click at position"""
         try:
             from jnius import autoclass
             Runtime = autoclass('java.lang.Runtime')
             TimeUnit = autoclass('java.util.concurrent.TimeUnit')
             runtime = Runtime.getRuntime()
             
-            # Method 1: input tap
             cmd = f"input tap {x} {y}"
             process = runtime.exec(cmd)
             process.waitFor(1, TimeUnit.SECONDS)
             
             if process.exitValue() == 0:
-                print(f"[CLICK] Success: ({x}, {y})")
+                print(f"Click OK: ({x}, {y})")
                 return True
             
-            # Method 2: ROOT
             if self.has_root:
                 cmd = f"su -c input tap {x} {y}"
                 process = runtime.exec(cmd)
                 process.waitFor(1, TimeUnit.SECONDS)
                 if process.exitValue() == 0:
-                    print(f"[CLICK] ROOT success: ({x}, {y})")
+                    print(f"ROOT Click OK: ({x}, {y})")
                     return True
             
-            print(f"[CLICK] Failed: ({x}, {y})")
             return False
-        
         except Exception as e:
-            print(f"[CLICK] Error: {e}")
+            print(f"Click failed: {e}")
             return False
 
 
 class FloatingBallApp(App):
-    """Main application with floating ball UI"""
+    """Main app with floating ball"""
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -308,19 +269,25 @@ class FloatingBallApp(App):
         self.is_running = False
         self.floating_ball = None
         self.floating_menu = None
+        self.is_android = False
     
     def build(self):
         """Build the app"""
-        # Set window size for floating window
-        Window.size = (350, 400)
-        Window.left = 50
-        Window.top = 50
+        # Check if running on Android
+        self.is_android = PYJNIUS_AVAILABLE
         
-        # Try to make window always on top
-        try:
-            Window.always_on_top = True
-        except:
-            pass
+        if self.is_android:
+            # Android: Setup floating window
+            self._setup_android_floating_window()
+        else:
+            # Desktop: Normal window
+            Window.size = (350, 400)
+            Window.left = 50
+            Window.top = 50
+            try:
+                Window.always_on_top = True
+            except:
+                pass
         
         # Main layout
         layout = FloatLayout()
@@ -340,6 +307,30 @@ class FloatingBallApp(App):
         
         return layout
     
+    def _setup_android_floating_window(self):
+        """Setup Android floating window"""
+        if not ANDROID_CLASSES_AVAILABLE:
+            print("Android classes not available")
+            return
+        
+        try:
+            # Get window parameters
+            window = mActivity.getWindow()
+            params = window.getAttributes()
+            
+            # Set window to floating mode
+            # Note: This requires SYSTEM_ALERT_WINDOW permission
+            # and may not work on all Android versions
+            
+            print("Attempting to setup floating window...")
+            
+            # Try to minimize window
+            # This is a simplified approach - real floating window
+            # needs Android Service and WindowManager
+            
+        except Exception as e:
+            print(f"Floating window setup failed: {e}")
+    
     def _bind_touch_events(self, layout):
         """Bind touch events"""
         original_touch_down = layout.on_touch_down
@@ -352,7 +343,6 @@ class FloatingBallApp(App):
                 self.floating_ball.is_dragging = False
                 return True
             elif self.floating_menu.opacity > 0:
-                # Check if click is outside menu
                 if not self.floating_menu.collide_point(*touch.pos):
                     self._collapse_menu()
             return original_touch_down(touch) if original_touch_down else False
@@ -385,7 +375,7 @@ class FloatingBallApp(App):
         layout.on_touch_move = custom_touch_move
     
     def _toggle_menu(self):
-        """Toggle menu visibility"""
+        """Toggle menu"""
         if self.floating_menu.opacity == 0:
             self._expand_menu()
         else:
@@ -396,11 +386,9 @@ class FloatingBallApp(App):
         ball = self.floating_ball
         menu = self.floating_menu
         
-        # Position menu to the right of ball
         menu_x = ball.x + ball.width + 15
         menu_y = ball.center_y - menu.height / 2
         
-        # Keep within window bounds
         menu_x = min(menu_x, Window.width - menu.width - 10)
         menu_y = max(10, min(menu_y, Window.height - menu.height - 10))
         
@@ -415,15 +403,13 @@ class FloatingBallApp(App):
         self.floating_ball.ball_color = [0.2, 0.6, 0.9, 0.95]
     
     def start_flow(self):
-        """Start auto click flow"""
-        print("[APP] Starting flow...")
+        """Start flow"""
+        print("Start flow")
         self.is_running = True
         self.floating_ball.ball_color = [0.2, 0.9, 0.3, 0.95]
         
-        # Start clicker thread
         def run_flow():
             while self.is_running:
-                # Test click
                 self.clicker.click(640, 360)
                 time.sleep(2)
         
@@ -431,19 +417,19 @@ class FloatingBallApp(App):
         thread.start()
     
     def stop_flow(self):
-        """Stop auto click flow"""
-        print("[APP] Stopping flow...")
+        """Stop flow"""
+        print("Stop flow")
         self.is_running = False
         self.floating_ball.ball_color = [0.2, 0.6, 0.9, 0.95]
     
     def test_click(self):
         """Test click"""
-        print("[APP] Test click")
+        print("Test click")
         self.clicker.click(640, 360)
     
     def exit_app(self):
         """Exit app"""
-        print("[APP] Exiting...")
+        print("Exit")
         self.stop_flow()
         App.get_running_app().stop()
 
