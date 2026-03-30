@@ -1,622 +1,452 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-WangZhe Auto Clicker - Floating Window Version
-With permissions and floating window support
+WangZhe Auto Clicker v3.4.0 - Floating Ball Mode
+Features:
+- Floating ball on desktop (draggable)
+- Click to expand/collapse menu
+- Always on top
+- Smooth animations
 """
 
-from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.scrollview import ScrollView
-from kivy.core.window import Window
-from kivy.clock import Clock
-from kivy.graphics import Color, Rectangle
-import time
 import threading
+import time
+import os
 
-print("========================================")
-print("WangZhe Auto Clicker Starting")
-print("========================================")
+# Try to import Android API
+try:
+    from jnius import autoclass
+    PYJNIUS_AVAILABLE = True
+except:
+    PYJNIUS_AVAILABLE = False
 
-# Global variables
-PYJNIUS_AVAILABLE = False
 ANDROID_API_AVAILABLE = False
 mActivity = None
-CV_AVAILABLE = False
 
-# Try to load OpenCV
+# Try to import OpenCV
 try:
     import cv2
     import numpy as np
     CV_AVAILABLE = True
-    print("OpenCV loaded successfully")
-except ImportError:
-    print("OpenCV not available, image recognition disabled")
+except:
+    CV_AVAILABLE = False
+
+from kivy.app import App
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.widget import Widget
+from kivy.core.window import Window
+from kivy.graphics import Color, Ellipse, RoundedRectangle, Line
+from kivy.clock import Clock
+from kivy.animation import Animation
+from kivy.properties import NumericProperty, BooleanProperty, ListProperty
+
+print("=" * 50)
+print("WangZhe Floating Ball v3.4.0")
+print("=" * 50)
 
 
-class ImageMatcher:
-    """Image matcher for template matching"""
+class FloatingBall(Widget):
+    """Floating ball widget - draggable ball with animations"""
+    
+    ball_size = NumericProperty(70)
+    is_expanded = BooleanProperty(False)
+    ball_color = ListProperty([0.2, 0.6, 0.9, 0.95])
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size_hint = (None, None)
+        self.size = (70, 70)
+        self.pos = (100, 100)
+        
+        # Touch tracking
+        self.touch_start_pos = None
+        self.is_dragging = False
+        self.drag_threshold = 15
+        
+        # Draw ball
+        self.bind(pos=self.update_ball, size=self.update_ball)
+    
+    def update_ball(self, *args):
+        """Update ball graphics"""
+        self.canvas.clear()
+        with self.canvas:
+            # Outer glow
+            Color(0.2, 0.6, 0.9, 0.2)
+            Ellipse(pos=(self.x - 5, self.y - 5), size=(self.width + 10, self.height + 10))
+            
+            # Ball shadow
+            Color(0, 0, 0, 0.4)
+            Ellipse(pos=(self.x + 4, self.y - 4), size=self.size)
+            
+            # Main ball
+            Color(*self.ball_color)
+            Ellipse(pos=self.pos, size=self.size)
+            
+            # Inner highlight
+            Color(1, 1, 1, 0.4)
+            Ellipse(pos=(self.x + 12, self.y + 25), size=(30, 18))
+            
+            # Center play icon
+            Color(1, 1, 1, 0.9)
+            cx, cy = self.center
+            points = [cx - 8, cy - 10, cx - 8, cy + 10, cx + 12, cy]
+            Line(points=points, width=2, close=False)
 
-    def __init__(self, template_dir='templates', threshold=0.9):
-        self.template_dir = template_dir
-        self.threshold = threshold
-        self.cv_available = CV_AVAILABLE
-        self.button_templates = {}
-        self.text_templates = {}
 
-        if self.cv_available:
-            self._load_templates()
-
-    def _load_templates(self):
-        """Load template images"""
-        import os
-        if not os.path.exists(self.template_dir):
-            print(f"Template directory not found: {self.template_dir}")
-            return
-
-        print("Loading templates...")
-
-        # Button templates
-        button_files = {
-            'login': 'template_login.png',
-            'login_popup': 'template_login_popup.png',
-            'game_lobby': 'template_game_lobby.png',
-            'match_screen': 'template_match.png',
-            'ai_mode_screen': 'template_ai_mode.png',
-            'start_game_screen': 'template_start_game.png',
-            'prepare_screen': 'template_prepare.png',
-            'ready_game': 'template_ready_game.png',
-            'game_over': 'template_game_over.png',
-            'settlement_hero': 'template_settlement.png',
-            'return_room': 'template_return.png',
-        }
-
-        for name, filename in button_files.items():
-            path = os.path.join(self.template_dir, filename)
-            if os.path.exists(path):
-                template = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-                if template is not None:
-                    self.button_templates[name] = template
-                    print(f"Loaded button template: {name}")
-
-    def find_template(self, screenshot, template_key):
-        """Find template in screenshot"""
-        if not self.cv_available or screenshot is None:
-            return False, 0, 0, 0, 0, 0
-
-        if template_key not in self.button_templates:
-            return False, 0, 0, 0, 0, 0
-
-        try:
-            template = self.button_templates[template_key]
-            result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-
-            if max_val >= self.threshold:
-                h, w = template.shape
-                return True, max_loc[0], max_loc[1], w, h, max_val
-        except Exception as e:
-            print(f"Template matching error: {e}")
-
-        return False, 0, 0, 0, 0, 0
+class FloatingMenu(BoxLayout):
+    """Expandable menu panel"""
+    
+    def __init__(self, app_instance=None, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = 'vertical'
+        self.size_hint = (None, None)
+        self.size = (200, 320)
+        self.opacity = 0
+        self.pos = (-1000, -1000)
+        self.app_instance = app_instance
+        
+        # Padding
+        self.padding = [10, 10, 10, 10]
+        self.spacing = 8
+        
+        # Background
+        with self.canvas.before:
+            Color(0.12, 0.12, 0.12, 0.95)
+            self.bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[12])
+        
+        self.bind(pos=self.update_bg, size=self.update_bg)
+        
+        # Build menu
+        self._build_menu()
+    
+    def update_bg(self, *args):
+        """Update background"""
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
+    
+    def _build_menu(self):
+        """Build menu buttons"""
+        # Title
+        title = Label(
+            text="[b]WangZhe Clicker[/b]\n[size=11]v3.4.0[/size]",
+            markup=True,
+            size_hint_y=None,
+            height=50,
+            color=(0.95, 0.95, 0.95, 1),
+            halign='center'
+        )
+        title.bind(texture_size=title.setter('size'))
+        self.add_widget(title)
+        
+        # Status label
+        self.status_label = Label(
+            text="[color=00ff00]● Ready[/color]",
+            markup=True,
+            size_hint_y=None,
+            height=30,
+            font_size=12,
+            color=(0.8, 0.8, 0.8, 1)
+        )
+        self.add_widget(self.status_label)
+        
+        # Buttons
+        buttons = [
+            ("▶ Start", self._on_start, (0.15, 0.6, 0.25, 0.9)),
+            ("⏸ Stop", self._on_stop, (0.7, 0.25, 0.25, 0.9)),
+            ("🔄 Test", self._on_test, (0.25, 0.45, 0.75, 0.9)),
+            ("✕ Exit", self._on_exit, (0.4, 0.4, 0.4, 0.9)),
+        ]
+        
+        for text, callback, color in buttons:
+            btn = Button(
+                text=text,
+                size_hint_y=None,
+                height=45,
+                background_color=color,
+                background_normal='',
+                font_size=14,
+                bold=True
+            )
+            btn.bind(on_press=callback)
+            self.add_widget(btn)
+    
+    def _on_start(self, instance):
+        """Start flow"""
+        print("[MENU] Start pressed")
+        if self.app_instance:
+            self.app_instance.start_flow()
+            self.status_label.text = "[color=00ff00]● Running[/color]"
+    
+    def _on_stop(self, instance):
+        """Stop flow"""
+        print("[MENU] Stop pressed")
+        if self.app_instance:
+            self.app_instance.stop_flow()
+            self.status_label.text = "[color=ffff00]● Stopped[/color]"
+    
+    def _on_test(self, instance):
+        """Test click"""
+        print("[MENU] Test pressed")
+        if self.app_instance:
+            self.app_instance.test_click()
+    
+    def _on_exit(self, instance):
+        """Exit app"""
+        print("[MENU] Exit pressed")
+        if self.app_instance:
+            self.app_instance.exit_app()
+    
+    def show(self, pos):
+        """Show menu with animation"""
+        self.pos = pos
+        anim = Animation(opacity=1, duration=0.2, t='out_quad')
+        anim.start(self)
+    
+    def hide(self):
+        """Hide menu"""
+        anim = Animation(opacity=0, duration=0.15, t='in_quad')
+        anim.bind(on_complete=lambda *args: setattr(self, 'pos', (-1000, -1000)))
+        anim.start(self)
 
 
 class SimpleClicker:
-    """Simple Clicker - With Android API and Permissions"""
-
-    # 11-step flow
-    STATES = {
-        'login': {
-            'name': 'Login',
-            'desc': 'Click "Start Game"',
-            'next': 'login_popup',
-            'coords': (641, 564)
-        },
-        'login_popup': {
-            'name': 'Close Popup',
-            'desc': 'Close login popup',
-            'next': 'game_lobby',
-            'coords': (640, 360)
-        },
-        'game_lobby': {
-            'name': 'Game Lobby',
-            'desc': 'Click "Battle"',
-            'next': 'match_screen',
-            'coords': (1178, 567)
-        },
-        'match_screen': {
-            'name': 'Match Screen',
-            'desc': 'Click match button',
-            'next': 'ai_mode_screen',
-            'coords': (640, 600)
-        },
-        'ai_mode_screen': {
-            'name': 'AI Mode',
-            'desc': 'Select AI mode',
-            'next': 'start_game_screen',
-            'coords': (640, 360)
-        },
-        'start_game_screen': {
-            'name': 'Start Game',
-            'desc': 'Click start game',
-            'next': 'prepare_screen',
-            'coords': (1153, 575)
-        },
-        'prepare_screen': {
-            'name': 'Prepare',
-            'desc': 'Click prepare button',
-            'next': 'ready_game',
-            'coords': (1153, 575)
-        },
-        'ready_game': {
-            'name': 'Ready',
-            'desc': 'Click ready button',
-            'next': 'game_over',
-            'coords': (1153, 575)
-        },
-        'game_over': {
-            'name': 'Game Over',
-            'desc': 'Continue after game',
-            'next': 'settlement_hero',
-            'coords': (640, 360)
-        },
-        'settlement_hero': {
-            'name': 'Settlement',
-            'desc': 'Click continue',
-            'next': 'return_room',
-            'coords': (640, 680)
-        },
-        'return_room': {
-            'name': 'Return Room',
-            'desc': 'Return to room',
-            'next': 'game_lobby',
-            'coords': (640, 680)
-        }
-    }
-
+    """Simple clicker for floating ball app"""
+    
     def __init__(self):
-        self.is_initialized = False
         self.screen_width = 1280
         self.screen_height = 720
         self.has_root = False
-        self.has_permissions = False
-        self.matcher = None
-        self.current_state = 'login'
+        self.is_initialized = False
         self.is_running = False
-
-        # Delay initialization - start after UI is ready
-        Clock.schedule_once(self._init_android, 2.0)
-        Clock.schedule_once(self._request_permissions, 2.5)
-        Clock.schedule_once(self._init_matcher, 3.0)
-
+        
+        # Initialize Android API
+        Clock.schedule_once(self._init_android, 0.5)
+    
     def _init_android(self, dt):
-        """Initialize Android (delayed)"""
-        global PYJNIUS_AVAILABLE, ANDROID_API_AVAILABLE, mActivity
-
+        """Initialize Android API"""
+        global ANDROID_API_AVAILABLE, mActivity
+        
         try:
-            print("Initializing Android API...")
-            from jnius import autoclass
-            PYJNIUS_AVAILABLE = True
-            print("Pyjnius loaded successfully")
-
-            # Get activity with timeout
-            print("Getting PythonActivity...")
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            mActivity = PythonActivity.mActivity
-            print(f"Activity: {mActivity}")
-
-            # Get screen size
-            print("Getting screen size...")
-            display = mActivity.getWindowManager().getDefaultDisplay()
-            Point = autoclass('android.graphics.Point')()
-            display.getSize(Point)
-            self.screen_width = Point.x
-            self.screen_height = Point.y
-            print(f"Screen size: {self.screen_width}x{self.screen_height}")
-
-            # Check ROOT
-            print("Checking ROOT...")
-            self._check_root()
-
-            ANDROID_API_AVAILABLE = True
-            self.is_initialized = True
-
-            print(f"Android initialized successfully")
-            print(f"ROOT access: {self.has_root}")
-
+            if PYJNIUS_AVAILABLE:
+                from jnius import autoclass
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                mActivity = PythonActivity.mActivity
+                
+                # Get screen size
+                display = mActivity.getWindowManager().getDefaultDisplay()
+                Point = autoclass('android.graphics.Point')()
+                display.getSize(Point)
+                self.screen_width = Point.x
+                self.screen_height = Point.y
+                
+                # Check ROOT
+                self._check_root()
+                
+                ANDROID_API_AVAILABLE = True
+                self.is_initialized = True
+                print(f"Android initialized: {self.screen_width}x{self.screen_height}")
+        
         except Exception as e:
             print(f"Android init failed: {e}")
-            import traceback
-            traceback.print_exc()
-            PYJNIUS_AVAILABLE = False
-            ANDROID_API_AVAILABLE = False
-            self.is_initialized = True
-            print("Continuing without Android API")
-
+    
     def _check_root(self):
-        """Check if device has ROOT access"""
+        """Check ROOT access"""
         try:
             from jnius import autoclass
             Runtime = autoclass('java.lang.Runtime')
             runtime = Runtime.getRuntime()
-            # Just check if su binary exists, don't wait for it
             process = runtime.exec("which su")
             process.waitFor()
-            exit_value = process.exitValue()
-            self.has_root = (exit_value == 0)
-            print(f"ROOT check: {'available' if self.has_root else 'not available'}")
-        except Exception as e:
-            print(f"ROOT check failed: {e}")
+            self.has_root = (process.exitValue() == 0)
+            print(f"ROOT: {self.has_root}")
+        except:
             self.has_root = False
-            print("ROOT access not available")
-
-    def _request_permissions(self, dt):
-        """Request necessary permissions"""
-        print("Checking permissions...")
-        self.has_permissions = True
-        print("Permissions check skipped (will check on use)")
-
-    def _init_matcher(self, dt):
-        """Initialize image matcher"""
-        try:
-            self.matcher = ImageMatcher(threshold=0.9)
-            print(f"Image matcher initialized: CV={CV_AVAILABLE}")
-        except Exception as e:
-            print(f"Image matcher init failed: {e}")
-            self.matcher = None
-
-    def capture_screen(self):
-        """Capture screen"""
-        if not CV_AVAILABLE:
-            print("[CAPTURE] OpenCV not available")
-            return None
-
-        if not ANDROID_API_AVAILABLE:
-            print("[CAPTURE] Android API not available")
-            return None
-
-        try:
-            import cv2
-
-            # Use app's private directory for screenshots
-            if mActivity:
-                files_dir = mActivity.getFilesDir().getAbsolutePath()
-                screenshot_path = f"{files_dir}/screen.png"
-            else:
-                screenshot_path = "/data/user/0/org.wangzhe.wangzheautoclicker/files/screen.png"
-
-            print(f"[CAPTURE] Saving to: {screenshot_path}")
-
-            # Capture screen
-            import subprocess
-            result = subprocess.run(
-                f"screencap -p {screenshot_path}",
-                shell=True,
-                capture_output=True,
-                timeout=3
-            )
-
-            if result.returncode != 0:
-                print(f"[CAPTURE] screencap failed: {result.stderr.decode()}")
-                return None
-
-            # Read image
-            img = cv2.imread(screenshot_path)
-
-            if img is not None:
-                print(f"[CAPTURE] Screen captured: {img.shape}")
-                return img
-            else:
-                print("[CAPTURE] Failed to read screenshot file")
-                return None
-
-        except Exception as e:
-            print(f"[CAPTURE] Error: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
-
+    
     def click(self, x, y):
-        """Click screen"""
-        print(f"[CLICK] Attempting to click at ({x}, {y})")
-
-        if not ANDROID_API_AVAILABLE:
-            print(f"[CLICK] Test mode - Android API not available")
-            return True
-
+        """Click at position"""
         try:
             from jnius import autoclass
             Runtime = autoclass('java.lang.Runtime')
             TimeUnit = autoclass('java.util.concurrent.TimeUnit')
             runtime = Runtime.getRuntime()
-
+            
             # Method 1: input tap
             cmd = f"input tap {x} {y}"
-            print(f"[CLICK] Method 1: {cmd}")
             process = runtime.exec(cmd)
             process.waitFor(1, TimeUnit.SECONDS)
-
-            exit_code = process.exitValue()
-            print(f"[CLICK] Method 1 result: exit code = {exit_code}")
-
-            if exit_code == 0:
-                print(f"[CLICK] SUCCESS")
+            
+            if process.exitValue() == 0:
+                print(f"[CLICK] Success: ({x}, {y})")
                 return True
-            else:
-                # Method 2: su -c input tap
-                cmd2 = f"su -c input tap {x} {y}"
-                print(f"[CLICK] Method 2: {cmd2}")
-                process2 = runtime.exec(cmd2)
-                process2.waitFor(1, TimeUnit.SECONDS)
-
-                exit_code2 = process2.exitValue()
-                print(f"[CLICK] Method 2 result: exit code = {exit_code2}")
-
-                if exit_code2 == 0:
-                    print(f"[CLICK] SUCCESS")
+            
+            # Method 2: ROOT
+            if self.has_root:
+                cmd = f"su -c input tap {x} {y}"
+                process = runtime.exec(cmd)
+                process.waitFor(1, TimeUnit.SECONDS)
+                if process.exitValue() == 0:
+                    print(f"[CLICK] ROOT success: ({x}, {y})")
                     return True
-                else:
-                    print(f"[CLICK] FAILED")
-                    return False
-
+            
+            print(f"[CLICK] Failed: ({x}, {y})")
+            return False
+        
         except Exception as e:
-            print(f"[CLICK] ERROR: {e}")
+            print(f"[CLICK] Error: {e}")
             return False
 
-    def get_screen_size(self):
-        """Get screen size"""
-        return self.screen_width, self.screen_height
 
-    def run_flow_step(self, state_name=None):
-        """Run one step of the flow"""
-        if state_name is None:
-            state_name = self.current_state
-
-        if state_name not in self.STATES:
-            print(f"Unknown state: {state_name}")
-            return False
-
-        state = self.STATES[state_name]
-        print(f"\n[STEP] {state['name']}: {state['desc']}")
-
-        # Try image matching first
-        x, y = None, None
-        if self.matcher and CV_AVAILABLE:
-            print(f"[STEP] Trying image matching...")
-            screenshot = self.capture_screen()
-            if screenshot is not None:
-                # Try to find template
-                found, fx, fy, fw, fh, score = self.matcher.find_template(screenshot, state_name)
-                if found and score >= 0.9:
-                    x = fx + fw // 2  # Center of matched region
-                    y = fy + fh // 2
-                    print(f"[STEP] Image matched at ({x}, {y}), score={score:.2f}")
-
-        # Fallback to coordinates
-        if x is None or y is None:
-            x, y = state['coords']
-            # Scale coordinates to screen size
-            scale_x = self.screen_width / 1280
-            scale_y = self.screen_height / 720
-            scaled_x = int(x * scale_x)
-            scaled_y = int(y * scale_y)
-            print(f"[STEP] Using coordinates: ({scaled_x}, {scaled_y})")
-            x, y = scaled_x, scaled_y
-
-        # Click
-        result = self.click(x, y)
-
-        # Move to next state
-        self.current_state = state['next']
-
-        return result
-
-    def run_full_flow(self, callback=None, loop=True):
-        """Run complete flow in loop"""
-        if self.is_running:
-            print("Flow already running")
-            return
-
-        self.is_running = True
-        self.current_state = 'login'
-
-        def run():
-            loop_count = 0
-            while self.is_running:
-                loop_count += 1
-                print(f"\n{'='*50}")
-                print(f"LOOP #{loop_count}")
-                print(f"{'='*50}")
-
-                if callback:
-                    callback(f"Loop #{loop_count}")
-
-                step = 0
-                while self.is_running and step < 11:
-                    step += 1
-                    result = self.run_flow_step()
-
-                    if callback:
-                        callback(f"Loop {loop_count}, Step {step}/11: {self.STATES[self.current_state]['name']}")
-
-                    if not result:
-                        print(f"Flow stopped at step {step}")
-                        break
-
-                    time.sleep(2)  # Wait between steps
-
-                # Reset state for next loop
-                self.current_state = 'login'
-
-                if not loop:
-                    break
-
-                # Wait before starting next loop
-                if self.is_running:
-                    print(f"\nLoop {loop_count} completed. Waiting 3 seconds before next loop...")
-                    time.sleep(3)
-
-            self.is_running = False
-            if callback:
-                callback("Flow stopped!")
-
-        thread = threading.Thread(target=run)
-        thread.daemon = True
-        thread.start()
-
-
-class FloatingBoxLayout(BoxLayout):
-    """Floating window layout with transparency"""
-
+class FloatingBallApp(App):
+    """Main application with floating ball UI"""
+    
     def __init__(self, **kwargs):
-        super(FloatingBoxLayout, self).__init__(**kwargs)
-
-        # Set transparency
-        with self.canvas.before:
-            Color(0, 0, 0, 0.5)  # 50% transparent black
-            self.rect = Rectangle(size=self.size, pos=self.pos)
-
-        self.bind(size=self._update_rect, pos=self._update_rect)
-
-    def _update_rect(self, instance, value):
-        self.rect.size = instance.size
-        self.rect.pos = instance.pos
-
-
-class WangZheApp(App):
-    """WangZhe Auto Clicker - Floating Window"""
-
-    title = "WangZhe Auto Clicker v3.3.6"
-
-    def build(self):
-        # Set window transparency and size
-        Window.size = (300, 500)  # Floating window size
-        Window.left = 100
-        Window.top = 100
-
-        # Create floating layout
-        layout = FloatingBoxLayout(orientation='vertical', padding=10, spacing=10)
-
-        # Title
-        title = Label(
-            text="WangZhe Clicker\nv3.3.6 - Loop Mode",
-            size_hint_y=None,
-            height=60,
-            font_size='16sp',
-            bold=True
-        )
-        layout.add_widget(title)
-
-        # Status
-        self.status = Label(
-            text="Status: Initializing...",
-            size_hint_y=None,
-            height=60,
-            font_size='12sp'
-        )
-        layout.add_widget(self.status)
-
-        # Click counter
-        self.click_count = 0
-
-        # Initialize clicker
+        super().__init__(**kwargs)
         self.clicker = SimpleClicker()
-
-        # Update status after 2 seconds
-        Clock.schedule_once(self._update_status, 2.0)
-
-        # Buttons
-        btn_layout = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
-        btn_layout.bind(minimum_height=btn_layout.setter('height'))
-
-        # Run full flow button
-        flow_btn = Button(text="Run Flow (11 Steps)", size_hint_y=None, height=50)
-        flow_btn.bind(on_press=self._run_flow)
-        btn_layout.add_widget(flow_btn)
-
-        # Test click button
-        test_btn = Button(text="Test Click", size_hint_y=None, height=50)
-        test_btn.bind(on_press=self._test_click)
-        btn_layout.add_widget(test_btn)
-
-        # Quick step buttons
-        for state_name in ['login', 'game_lobby', 'start_game_screen']:
-            state = SimpleClicker.STATES[state_name]
-            btn = Button(text=f"{state['name']}", size_hint_y=None, height=40)
-            btn.state_name = state_name
-            btn.bind(on_press=self._run_step)
-            btn_layout.add_widget(btn)
-
-        # Refresh status
-        refresh_btn = Button(text="Refresh Status", size_hint_y=None, height=50)
-        refresh_btn.bind(on_press=self._refresh)
-        btn_layout.add_widget(refresh_btn)
-
-        # Exit button
-        exit_btn = Button(text="Exit", size_hint_y=None, height=50)
-        exit_btn.bind(on_press=self._exit_app)
-        btn_layout.add_widget(exit_btn)
-
-        layout.add_widget(btn_layout)
-
-        print("UI build completed")
+        self.is_running = False
+        self.floating_ball = None
+        self.floating_menu = None
+    
+    def build(self):
+        """Build the app"""
+        # Set window size for floating window
+        Window.size = (350, 400)
+        Window.left = 50
+        Window.top = 50
+        
+        # Try to make window always on top
+        try:
+            Window.always_on_top = True
+        except:
+            pass
+        
+        # Main layout
+        layout = FloatLayout()
+        
+        # Create floating ball
+        self.floating_ball = FloatingBall()
+        self.floating_ball.pos = (140, 165)
+        layout.add_widget(self.floating_ball)
+        
+        # Create menu
+        self.floating_menu = FloatingMenu(app_instance=self)
+        self.floating_menu.pos = (-1000, -1000)
+        layout.add_widget(self.floating_menu)
+        
+        # Bind touch events
+        self._bind_touch_events(layout)
+        
         return layout
-
-    def _update_status(self, dt):
-        """Update status"""
-        if self.clicker.is_initialized and ANDROID_API_AVAILABLE:
-            w, h = self.clicker.get_screen_size()
-            cv_status = "CV OK" if CV_AVAILABLE else "CV N/A"
-            root_status = "ROOT OK" if self.clicker.has_root else "ROOT N/A"
-            perm_status = "PERM OK" if self.clicker.has_permissions else "PERM N/A"
-            self.status.text = f"Screen: {w}x{h}\n{cv_status}\n{root_status}\n{perm_status}"
+    
+    def _bind_touch_events(self, layout):
+        """Bind touch events"""
+        original_touch_down = layout.on_touch_down
+        original_touch_up = layout.on_touch_up
+        original_touch_move = layout.on_touch_move
+        
+        def custom_touch_down(touch):
+            if self.floating_ball.collide_point(*touch.pos):
+                self.floating_ball.touch_start_pos = touch.pos
+                self.floating_ball.is_dragging = False
+                return True
+            elif self.floating_menu.opacity > 0:
+                # Check if click is outside menu
+                if not self.floating_menu.collide_point(*touch.pos):
+                    self._collapse_menu()
+            return original_touch_down(touch) if original_touch_down else False
+        
+        def custom_touch_move(touch):
+            if self.floating_ball.touch_start_pos:
+                dx = touch.pos[0] - self.floating_ball.touch_start_pos[0]
+                dy = touch.pos[1] - self.floating_ball.touch_start_pos[1]
+                distance = (dx**2 + dy**2) ** 0.5
+                
+                if distance > self.floating_ball.drag_threshold:
+                    self.floating_ball.is_dragging = True
+                    new_x = touch.pos[0] - self.floating_ball.width / 2
+                    new_y = touch.pos[1] - self.floating_ball.height / 2
+                    self.floating_ball.pos = (new_x, new_y)
+                return True
+            return original_touch_move(touch) if original_touch_move else False
+        
+        def custom_touch_up(touch):
+            if self.floating_ball.touch_start_pos:
+                if not self.floating_ball.is_dragging:
+                    self._toggle_menu()
+                self.floating_ball.touch_start_pos = None
+                self.floating_ball.is_dragging = False
+                return True
+            return original_touch_up(touch) if original_touch_up else False
+        
+        layout.on_touch_down = custom_touch_down
+        layout.on_touch_up = custom_touch_up
+        layout.on_touch_move = custom_touch_move
+    
+    def _toggle_menu(self):
+        """Toggle menu visibility"""
+        if self.floating_menu.opacity == 0:
+            self._expand_menu()
         else:
-            self.status.text = "Status: Test Mode"
-
-    def _run_flow(self, instance):
-        """Run full flow"""
-        print(f"[BUTTON] Run Full Flow button pressed")
-        self.status.text = "Running flow..."
-        self.clicker.run_full_flow(callback=self._update_flow_status)
-
-    def _update_flow_status(self, message):
-        """Update flow status"""
-        from kivy.clock import Clock
-        Clock.schedule_once(lambda dt: setattr(self.status, 'text', message), 0)
-
-    def _test_click(self, instance):
+            self._collapse_menu()
+    
+    def _expand_menu(self):
+        """Expand menu"""
+        ball = self.floating_ball
+        menu = self.floating_menu
+        
+        # Position menu to the right of ball
+        menu_x = ball.x + ball.width + 15
+        menu_y = ball.center_y - menu.height / 2
+        
+        # Keep within window bounds
+        menu_x = min(menu_x, Window.width - menu.width - 10)
+        menu_y = max(10, min(menu_y, Window.height - menu.height - 10))
+        
+        menu.show((menu_x, menu_y))
+        ball.is_expanded = True
+        ball.ball_color = [0.3, 0.8, 0.3, 0.95]
+    
+    def _collapse_menu(self):
+        """Collapse menu"""
+        self.floating_menu.hide()
+        self.floating_ball.is_expanded = False
+        self.floating_ball.ball_color = [0.2, 0.6, 0.9, 0.95]
+    
+    def start_flow(self):
+        """Start auto click flow"""
+        print("[APP] Starting flow...")
+        self.is_running = True
+        self.floating_ball.ball_color = [0.2, 0.9, 0.3, 0.95]
+        
+        # Start clicker thread
+        def run_flow():
+            while self.is_running:
+                # Test click
+                self.clicker.click(640, 360)
+                time.sleep(2)
+        
+        thread = threading.Thread(target=run_flow, daemon=True)
+        thread.start()
+    
+    def stop_flow(self):
+        """Stop auto click flow"""
+        print("[APP] Stopping flow...")
+        self.is_running = False
+        self.floating_ball.ball_color = [0.2, 0.6, 0.9, 0.95]
+    
+    def test_click(self):
         """Test click"""
-        self.click_count += 1
-        print(f"[BUTTON] Test Click button pressed (count: {self.click_count})")
+        print("[APP] Test click")
         self.clicker.click(640, 360)
-        self.status.text = f"Clicked: (640, 360)\nCount: {self.click_count}"
-
-    def _run_step(self, instance):
-        """Run single step"""
-        state_name = instance.state_name
-        print(f"[BUTTON] Run step: {state_name}")
-        self.clicker.run_flow_step(state_name)
-        self.status.text = f"Step: {SimpleClicker.STATES[state_name]['name']}"
-
-    def _refresh(self, instance):
-        """Refresh"""
-        self._update_status(0)
-
-    def _exit_app(self, instance):
+    
+    def exit_app(self):
         """Exit app"""
-        print("[APP] Exit requested")
+        print("[APP] Exiting...")
+        self.stop_flow()
         App.get_running_app().stop()
 
 
 if __name__ == '__main__':
-    print("========================================")
-    print("Starting Kivy App - Floating Window")
-    print("========================================")
-    try:
-        WangZheApp().run()
-    except Exception as e:
-        print(f"Startup Error: {e}")
-        import traceback
-        traceback.print_exc()
+    FloatingBallApp().run()

@@ -13,7 +13,7 @@ source.include_exts = py,png,jpg,kv,atlas,json,txt
 source.include_dirs = templates
 
 # Version
-version = 3.3.6
+version = 3.4.0
 
 # Dependencies - Include OpenCV for image recognition
 requirements = python3,kivy,pyjnius,opencv,numpy
