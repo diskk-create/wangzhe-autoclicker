@@ -223,6 +223,36 @@ class SimpleClicker:
             print(f"Image matcher init failed: {e}")
             self.matcher = None
 
+    def capture_screen(self):
+        """Capture screen"""
+        if not CV_AVAILABLE:
+            print("[CAPTURE] OpenCV not available")
+            return None
+
+        try:
+            from jnius import autoclass
+            Runtime = autoclass('java.lang.Runtime')
+            runtime = Runtime.getRuntime()
+
+            # Capture screen to file
+            process = runtime.exec("screencap -p /sdcard/screen.png")
+            process.waitFor(2, TimeUnit.SECONDS) if 'TimeUnit' in dir() else process.waitFor()
+
+            # Read image
+            import cv2
+            img = cv2.imread("/sdcard/screen.png")
+
+            if img is not None:
+                print(f"[CAPTURE] Screen captured: {img.shape}")
+                return img
+            else:
+                print("[CAPTURE] Failed to read screenshot")
+                return None
+
+        except Exception as e:
+            print(f"[CAPTURE] Error: {e}")
+            return None
+
     def click(self, x, y):
         """Click screen"""
         print(f"[CLICK] Attempting to click at ({x}, {y})")
@@ -286,17 +316,35 @@ class SimpleClicker:
         state = self.STATES[state_name]
         print(f"\n[STEP] {state['name']}: {state['desc']}")
 
-        # Get click coordinates
-        x, y = state['coords']
+        # Try image matching first
+        x, y = None, None
+        if self.matcher and CV_AVAILABLE:
+            print(f"[STEP] Trying image matching...")
+            screenshot = self.capture_screen()
+            if screenshot is not None:
+                # Try to find template
+                found, fx, fy, fw, fh, score = self.matcher.find_template(screenshot, state_name)
+                if found and score >= 0.9:
+                    x = fx + fw // 2  # Center of matched region
+                    y = fy + fh // 2
+                    print(f"[STEP] Image matched at ({x}, {y}), score={score:.2f}")
 
-        # Scale coordinates to screen size
-        scale_x = self.screen_width / 1280
-        scale_y = self.screen_height / 720
-        scaled_x = int(x * scale_x)
-        scaled_y = int(y * scale_y)
+        # Fallback to coordinates
+        if x is None or y is None:
+            x, y = state['coords']
+            # Scale coordinates to screen size
+            scale_x = self.screen_width / 1280
+            scale_y = self.screen_height / 720
+            scaled_x = int(x * scale_x)
+            scaled_y = int(y * scale_y)
+            print(f"[STEP] Using coordinates: ({scaled_x}, {scaled_y})")
+            x, y = scaled_x, scaled_y
+        else:
+            # Already have matched coordinates
+            pass
 
-        print(f"[STEP] Clicking at ({scaled_x}, {scaled_y})")
-        result = self.click(scaled_x, scaled_y)
+        # Click
+        result = self.click(x, y)
 
         # Move to next state
         self.current_state = state['next']
@@ -339,14 +387,14 @@ class SimpleClicker:
 class WangZheApp(App):
     """WangZhe Auto Clicker"""
 
-    title = "WangZhe Auto Clicker v3.1.0"
+    title = "WangZhe Auto Clicker v3.2.0"
 
     def build(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
 
         # Title
         title = Label(
-            text="WangZhe Auto Clicker\nv3.1.0 - Full Flow",
+            text="WangZhe Auto Clicker\nv3.2.0 - With Screenshot",
             size_hint_y=None,
             height=100,
             font_size='22sp',
@@ -391,7 +439,8 @@ class WangZheApp(App):
         for state_name in ['login', 'game_lobby', 'match_screen', 'start_game_screen']:
             state = SimpleClicker.STATES[state_name]
             btn = Button(text=f"{state['name']}: {state['desc']}", size_hint_y=None, height=60)
-            btn.bind(on_press=lambda instance, s=state_name: self._run_step(s))
+            btn.state_name = state_name  # Store state_name in button
+            btn.bind(on_press=self._run_step)
             btns.add_widget(btn)
 
         # Refresh status
@@ -434,8 +483,9 @@ class WangZheApp(App):
         self.status.text = f"Clicked: (640, 360)\nCount: {self.click_count}"
         print(f"[BUTTON] Click function returned")
 
-    def _run_step(self, state_name):
+    def _run_step(self, instance):
         """Run single step"""
+        state_name = instance.state_name
         print(f"[BUTTON] Run step: {state_name}")
         self.clicker.run_flow_step(state_name)
         self.status.text = f"Step: {SimpleClicker.STATES[state_name]['name']}"
