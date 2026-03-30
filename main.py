@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-王者荣耀自动点击器 - 完整版
-支持找图、找字、11步完整流程
-使用Pyjnius独立实现，不依赖android模块
+王者荣耀自动点击器 - 稳定版
+修复黑屏问题，增强错误处理
 """
 
 from kivy.app import App
@@ -11,158 +10,26 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
-from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
 from kivy.core.window import Window
 from kivy.clock import Clock
-from kivy.graphics import Color, Rectangle
 import time
 import os
 from pathlib import Path
 
-# 导入Pyjnius
-try:
-    from jnius import autoclass, cast
-    PYJNIUS_AVAILABLE = True
-    print("✓ Pyjnius已加载")
-except ImportError:
-    PYJNIUS_AVAILABLE = False
-    print("✗ Pyjnius未安装，运行在桌面模式")
+# 延迟导入，避免启动时崩溃
+PYJNIUS_AVAILABLE = False
+CV_AVAILABLE = False
+ANDROID_API_AVAILABLE = False
+mActivity = None
 
-# 导入OpenCV（可选）
-try:
-    import cv2
-    import numpy as np
-    CV_AVAILABLE = True
-    print("✓ OpenCV已加载，图像识别功能可用")
-except ImportError:
-    CV_AVAILABLE = False
-    print("✗ OpenCV未安装，仅使用坐标点击")
+class SimpleClicker:
+    """简单点击器 - 优先保证启动"""
 
-# Android API
-if PYJNIUS_AVAILABLE:
-    try:
-        PythonActivity = autoclass('org.kivy.android.PythonActivity')
-        Context = autoclass('android.content.Context')
-        Intent = autoclass('android.content.Intent')
-        Settings = autoclass('android.provider.Settings')
-        mActivity = PythonActivity.mActivity
-        ANDROID_API_AVAILABLE = True
-        print("✓ Android API已加载")
-    except Exception as e:
-        print(f"✗ Android API加载失败: {e}")
-        ANDROID_API_AVAILABLE = False
-else:
-    ANDROID_API_AVAILABLE = False
-
-
-class ImageMatcher:
-    """图像匹配器 - 找图和找字"""
-
-    def __init__(self, template_dir='templates', threshold=0.9):
-        self.template_dir = Path(template_dir)
-        self.threshold = threshold
-        self.cv_available = CV_AVAILABLE
-
-        # 按钮模板
-        self.button_templates = {}
-        # 文字模板
-        self.text_templates = {}
-
-        if self.cv_available:
-            self._load_templates()
-
-    def _load_templates(self):
-        """加载模板文件"""
-        if not self.template_dir.exists():
-            print(f"⚠ 模板目录不存在: {self.template_dir}")
-            return
-
-        # 按钮模板列表
-        button_templates = {
-            'login': 'template_login.png',
-            'login_popup': 'template_login_popup.png',
-            'game_lobby': 'template_game_lobby.png',
-            'match_screen': 'template_match.png',
-            'ai_mode_screen': 'template_ai_mode.png',
-            'start_game_screen': 'template_start_game.png',
-            'prepare_screen': 'template_prepare.png',
-            'ready_game': 'template_ready_game.png',
-            'game_over': 'template_game_over.png',
-            'settlement_hero': 'template_check.png',
-            'return_room': 'template_check.png'
-        }
-
-        # 文字模板列表
-        text_templates = {
-            'login': 'text_template_login.png',
-            'game_lobby': 'text_template_game_lobby.png',
-            'wangzhe_xiagu': 'text_template_wangzhe_xiagu.png',
-            'settlement_hero': 'text_template_settlement_hero.png',
-            'return_room': 'text_template_return_room.png'
-        }
-
-        # 加载按钮模板
-        print("\n加载模板文件:")
-        for name, filename in button_templates.items():
-            path = self.template_dir / filename
-            if path.exists():
-                template = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
-                if template is not None:
-                    self.button_templates[name] = template
-                    print(f"  ✓ 按钮模板: {name}")
-
-        # 加载文字模板
-        for name, filename in text_templates.items():
-            path = self.template_dir / filename
-            if path.exists():
-                template = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
-                if template is not None:
-                    self.text_templates[name] = template
-                    print(f"  ✓ 文字模板: {name}")
-
-        print(f"\n共加载: {len(self.button_templates)}个按钮模板, {len(self.text_templates)}个文字模板")
-
-    def match_template(self, screenshot, template):
-        """模板匹配"""
-        if not self.cv_available:
-            return False, None, 0.0
-
-        try:
-            # 转换为灰度图
-            if len(screenshot.shape) == 3:
-                gray = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
-            else:
-                gray = screenshot
-
-            # 模板匹配
-            result = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-
-            # 检查匹配阈值
-            if max_val >= self.threshold:
-                # 计算中心点
-                h, w = template.shape
-                center_x = max_loc[0] + w // 2
-                center_y = max_loc[1] + h // 2
-                return True, (center_x, center_y), max_val
-
-            return False, None, max_val
-        except Exception as e:
-            print(f"✗ 模板匹配失败: {e}")
-            return False, None, 0.0
-
-
-class AndroidClicker:
-    """Android点击器 - 完整版"""
-
-    def __init__(self, template_dir='templates'):
+    def __init__(self):
         self.is_initialized = False
         self.screen_width = 1280
         self.screen_height = 720
         self.has_root = False
-
-        # 初始化图像匹配器
-        self.matcher = ImageMatcher(template_dir, threshold=0.9)
 
         # 按钮坐标（基准1280x720）
         self.buttons = {
@@ -194,53 +61,55 @@ class AndroidClicker:
             ('return_room', 3, '返回房间')
         ]
 
-        # 初始化Android
-        if ANDROID_API_AVAILABLE:
-            self._init_android()
+        # 延迟初始化Android
+        Clock.schedule_once(self._init_android, 0.5)
 
-    def _init_android(self):
-        """初始化Android环境"""
+    def _init_android(self, dt):
+        """延迟初始化Android环境"""
+        global PYJNIUS_AVAILABLE, ANDROID_API_AVAILABLE, mActivity
+
         try:
-            # 获取屏幕尺寸
-            display = mActivity.getWindowManager().getDefaultDisplay()
-            Point = autoclass('android.graphics.Point')()
-            display.getSize(Point)
-            self.screen_width = Point.x
-            self.screen_height = Point.y
+            from jnius import autoclass
+            PYJNIUS_AVAILABLE = True
 
-            # 计算缩放比例
-            self.scale_x = self.screen_width / 1280.0
-            self.scale_y = self.screen_height / 720.0
+            try:
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                mActivity = PythonActivity.mActivity
 
-            # 检查ROOT权限
-            self._check_root()
+                # 获取屏幕尺寸
+                display = mActivity.getWindowManager().getDefaultDisplay()
+                Point = autoclass('android.graphics.Point')()
+                display.getSize(Point)
+                self.screen_width = Point.x
+                self.screen_height = Point.y
 
+                # 计算缩放比例
+                self.scale_x = self.screen_width / 1280.0
+                self.scale_y = self.screen_height / 720.0
+
+                ANDROID_API_AVAILABLE = True
+                self.is_initialized = True
+
+                print(f"✓ Android初始化成功")
+                print(f"  屏幕: {self.screen_width}x{self.screen_height}")
+                print(f"  缩放: {self.scale_x:.2f}x{self.scale_y:.2f}")
+
+            except Exception as e:
+                print(f"✗ Android API初始化失败: {e}")
+                self.is_initialized = True  # 继续运行，使用默认值
+
+        except ImportError:
+            print("✗ Pyjnius未安装，运行在桌面模式")
             self.is_initialized = True
-            print(f"✓ Android初始化成功")
-            print(f"  屏幕: {self.screen_width}x{self.screen_height}")
-            print(f"  缩放: {self.scale_x:.2f}x{self.scale_y:.2f}")
-            print(f"  ROOT: {'有' if self.has_root else '无'}")
-        except Exception as e:
-            print(f"✗ Android初始化失败: {e}")
-            self.is_initialized = False
-
-    def _check_root(self):
-        """检查ROOT权限"""
-        try:
-            Runtime = autoclass('java.lang.Runtime')
-            process = Runtime.getRuntime().exec("su")
-            process.waitFor()
-            self.has_root = (process.exitValue() == 0)
-        except:
-            self.has_root = False
 
     def click(self, x, y):
         """点击屏幕"""
         if not ANDROID_API_AVAILABLE:
-            print(f"[桌面] 点击: ({x}, {y})")
+            print(f"[桌面] 点击: ({int(x)}, {int(y)})")
             return True
 
         try:
+            from jnius import autoclass
             Runtime = autoclass('java.lang.Runtime')
             TimeUnit = autoclass('java.util.concurrent.TimeUnit')
             runtime = Runtime.getRuntime()
@@ -262,23 +131,12 @@ class AndroidClicker:
             return False
 
     def smart_click(self, button_name):
-        """智能点击 - 优先找图，其次找字，最后坐标"""
-        # 优先级1: 找图
-        if button_name in self.matcher.button_templates and CV_AVAILABLE:
-            # TODO: 实现截图功能
-            pass
-
-        # 优先级2: 找字
-        if button_name in self.matcher.text_templates and CV_AVAILABLE:
-            # TODO: 实现截图功能
-            pass
-
-        # 优先级3: 坐标点击（兜底）
+        """智能点击 - 坐标点击"""
         if button_name in self.buttons:
             button = self.buttons[button_name]
             # 缩放坐标
-            scaled_x = button['x'] * self.scale_x
-            scaled_y = button['y'] * self.scale_y
+            scaled_x = button['x'] * getattr(self, 'scale_x', 1.0)
+            scaled_y = button['y'] * getattr(self, 'scale_y', 1.0)
             print(f"[坐标点击] {button['desc']}: ({int(scaled_x)}, {int(scaled_y)})")
             return self.click(scaled_x, scaled_y)
 
@@ -290,7 +148,7 @@ class AndroidClicker:
         if step_index >= len(self.flow_steps):
             print("✓ 流程完成")
             if callback:
-                callback("流程完成")
+                callback("✓ 流程完成")
             return
 
         button_name, wait_time, desc = self.flow_steps[step_index]
@@ -307,7 +165,7 @@ class AndroidClicker:
             # 下一步
             if callback:
                 callback(f"步骤 {step_index + 1}/{len(self.flow_steps)}: {desc} ✓")
-            
+
             # 继续下一步
             self.run_flow(step_index + 1, callback)
         else:
@@ -316,19 +174,23 @@ class AndroidClicker:
 
 
 class WangZheApp(App):
-    """王者荣耀自动点击器 - 完整版"""
+    """王者荣耀自动点击器"""
 
-    title = "王者荣耀自动点击器 v3.0"
+    title = "王者荣耀自动点击器 v3.1"
 
     def build(self):
-        Window.fullscreen = 'auto'
+        # 设置全屏
+        try:
+            Window.fullscreen = 'auto'
+        except:
+            pass
 
         # 主布局
         layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
 
         # 标题
         title = Label(
-            text="王者荣耀自动点击器\nv3.0 完整版",
+            text="王者荣耀自动点击器\nv3.1 稳定版",
             size_hint_y=None,
             height=100,
             font_size='22sp',
@@ -346,16 +208,10 @@ class WangZheApp(App):
         layout.add_widget(self.status)
 
         # 初始化点击器
-        self.clicker = AndroidClicker()
+        self.clicker = SimpleClicker()
 
-        # 更新状态
-        if self.clicker.is_initialized:
-            w, h = self.clicker.screen_width, self.clicker.screen_height
-            root = "有ROOT" if self.clicker.has_root else "无ROOT"
-            cv = "有OpenCV" if CV_AVAILABLE else "无OpenCV"
-            self.status.text = f"状态: 已初始化\n屏幕: {w}x{h}\n{root} | {cv}"
-        else:
-            self.status.text = f"状态: 桌面模式\nOpenCV: {'有' if CV_AVAILABLE else '无'}"
+        # 延迟更新状态
+        Clock.schedule_once(self._update_status, 1.0)
 
         # 按钮
         btns = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
@@ -387,27 +243,35 @@ class WangZheApp(App):
 
         return layout
 
+    def _update_status(self, dt):
+        """更新状态"""
+        if self.clicker.is_initialized:
+            w, h = self.clicker.screen_width, self.clicker.screen_height
+            self.status.text = f"状态: 已初始化\n屏幕: {w}x{h}\n模式: 坐标点击"
+        else:
+            self.status.text = "状态: 初始化中..."
+
     def _run_flow(self, instance):
         """运行完整流程"""
         import threading
-        
+
         def run():
-            self.clicker.run_flow(callback=self._update_status)
-        
+            self.clicker.run_flow(callback=self._update_status_text)
+
         thread = threading.Thread(target=run)
         thread.daemon = True
         thread.start()
-        
+
         self.status.text = "正在运行流程..."
 
-    def _update_status(self, message):
-        """更新状态"""
+    def _update_status_text(self, message):
+        """更新状态文本"""
         Clock.schedule_once(lambda dt: setattr(self.status, 'text', message), 0)
 
     def _test_click(self, instance):
         """测试点击"""
         if not self.clicker.is_initialized:
-            self.status.text = "桌面模式\n点击: (640, 360)"
+            self.status.text = "初始化中...\n点击: (640, 360)"
             self.clicker.click(640, 360)
             return
 
@@ -424,6 +288,9 @@ class WangZheApp(App):
         """打开设置"""
         if ANDROID_API_AVAILABLE:
             try:
+                from jnius import autoclass
+                Intent = autoclass('android.content.Intent')
+                Settings = autoclass('android.provider.Settings')
                 intent = Intent(Settings.ACTION_SETTINGS)
                 mActivity.startActivity(intent)
                 self.status.text = "已打开系统设置"
@@ -435,14 +302,16 @@ class WangZheApp(App):
     def _refresh(self, instance):
         """刷新"""
         if self.clicker.is_initialized:
-            self.clicker._init_android()
             w, h = self.clicker.screen_width, self.clicker.screen_height
-            root = "有ROOT" if self.clicker.has_root else "无ROOT"
-            cv = "有OpenCV" if CV_AVAILABLE else "无OpenCV"
-            self.status.text = f"屏幕: {w}x{h}\n{root} | {cv}"
+            self.status.text = f"屏幕: {w}x{h}\n模式: 坐标点击"
         else:
-            self.status.text = f"桌面模式\nOpenCV: {'有' if CV_AVAILABLE else '无'}"
+            self.status.text = "初始化中..."
 
 
 if __name__ == '__main__':
-    WangZheApp().run()
+    try:
+        WangZheApp().run()
+    except Exception as e:
+        print(f"启动错误: {e}")
+        import traceback
+        traceback.print_exc()
