@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-WangZhe Auto Clicker - Complete Version
-With full 11-step flow and image recognition
+WangZhe Auto Clicker - Floating Window Version
+With permissions and floating window support
 """
 
 from kivy.app import App
@@ -12,6 +12,7 @@ from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
 from kivy.clock import Clock
+from kivy.graphics import Color, Rectangle
 import time
 import threading
 
@@ -59,12 +60,17 @@ class ImageMatcher:
 
         # Button templates
         button_files = {
+            'login': 'template_login.png',
             'login_popup': 'template_login_popup.png',
+            'game_lobby': 'template_game_lobby.png',
             'match_screen': 'template_match.png',
+            'ai_mode_screen': 'template_ai_mode.png',
             'start_game_screen': 'template_start_game.png',
             'prepare_screen': 'template_prepare.png',
             'ready_game': 'template_ready_game.png',
             'game_over': 'template_game_over.png',
+            'settlement_hero': 'template_settlement.png',
+            'return_room': 'template_return.png',
         }
 
         for name, filename in button_files.items():
@@ -98,7 +104,7 @@ class ImageMatcher:
 
 
 class SimpleClicker:
-    """Simple Clicker - With Android API"""
+    """Simple Clicker - With Android API and Permissions"""
 
     # 11-step flow
     STATES = {
@@ -175,13 +181,15 @@ class SimpleClicker:
         self.screen_width = 1280
         self.screen_height = 720
         self.has_root = False
+        self.has_permissions = False
         self.matcher = None
         self.current_state = 'login'
         self.is_running = False
 
         # Delay initialization
         Clock.schedule_once(self._init_android, 0.5)
-        Clock.schedule_once(self._init_matcher, 1.0)
+        Clock.schedule_once(self._request_permissions, 1.0)
+        Clock.schedule_once(self._init_matcher, 1.5)
 
     def _init_android(self, dt):
         """Initialize Android (delayed)"""
@@ -203,16 +211,83 @@ class SimpleClicker:
             self.screen_width = Point.x
             self.screen_height = Point.y
 
+            # Check ROOT
+            self._check_root()
+
             ANDROID_API_AVAILABLE = True
             self.is_initialized = True
 
             print(f"Android initialized: {self.screen_width}x{self.screen_height}")
+            print(f"ROOT access: {self.has_root}")
 
         except Exception as e:
             print(f"Android init failed: {e}")
             PYJNIUS_AVAILABLE = False
             ANDROID_API_AVAILABLE = False
             self.is_initialized = True
+
+    def _check_root(self):
+        """Check if device has ROOT access"""
+        try:
+            from jnius import autoclass
+            Runtime = autoclass('java.lang.Runtime')
+            runtime = Runtime.getRuntime()
+            process = runtime.exec("su")
+            process.waitFor()
+            self.has_root = True
+            print("ROOT access available")
+        except:
+            self.has_root = False
+            print("ROOT access not available")
+
+    def _request_permissions(self, dt):
+        """Request necessary permissions"""
+        if not ANDROID_API_AVAILABLE:
+            print("Permissions: Android API not available")
+            return
+
+        try:
+            print("Requesting permissions...")
+            from jnius import autoclass
+
+            # Get Context
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            activity = PythonActivity.mActivity
+
+            # Check and request permissions
+            if activity:
+                # Request storage permissions
+                if hasattr(activity, 'requestPermissions'):
+                    permissions = [
+                        'android.permission.READ_EXTERNAL_STORAGE',
+                        'android.permission.WRITE_EXTERNAL_STORAGE'
+                    ]
+                    activity.requestPermissions(permissions, 0)
+                    print("Storage permissions requested")
+
+                # Check SYSTEM_ALERT_WINDOW permission for floating window
+                Settings = autoclass('android.provider.Settings')
+                if hasattr(Settings, 'canDrawOverlays'):
+                    can_draw = Settings.canDrawOverlays(activity)
+                    print(f"Can draw overlays: {can_draw}")
+                    if not can_draw:
+                        print("Need SYSTEM_ALERT_WINDOW permission")
+                        # Open settings for overlay permission
+                        Intent = autoclass('android.content.Intent')
+                        Uri = autoclass('android.net.Uri')
+                        intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + activity.getPackageName())
+                        )
+                        activity.startActivity(intent)
+
+                self.has_permissions = True
+                print("Permissions requested")
+
+        except Exception as e:
+            print(f"Permission request failed: {e}")
+            self.has_permissions = False
 
     def _init_matcher(self, dt):
         """Initialize image matcher"""
@@ -229,14 +304,19 @@ class SimpleClicker:
             print("[CAPTURE] OpenCV not available")
             return None
 
+        if not ANDROID_API_AVAILABLE:
+            print("[CAPTURE] Android API not available")
+            return None
+
         try:
             from jnius import autoclass
             Runtime = autoclass('java.lang.Runtime')
+            TimeUnit = autoclass('java.util.concurrent.TimeUnit')
             runtime = Runtime.getRuntime()
 
             # Capture screen to file
             process = runtime.exec("screencap -p /sdcard/screen.png")
-            process.waitFor(2, TimeUnit.SECONDS) if 'TimeUnit' in dir() else process.waitFor()
+            process.waitFor(2, TimeUnit.SECONDS)
 
             # Read image
             import cv2
@@ -339,9 +419,6 @@ class SimpleClicker:
             scaled_y = int(y * scale_y)
             print(f"[STEP] Using coordinates: ({scaled_x}, {scaled_y})")
             x, y = scaled_x, scaled_y
-        else:
-            # Already have matched coordinates
-            pass
 
         # Click
         result = self.click(x, y)
@@ -384,20 +461,44 @@ class SimpleClicker:
         thread.start()
 
 
-class WangZheApp(App):
-    """WangZhe Auto Clicker"""
+class FloatingBoxLayout(BoxLayout):
+    """Floating window layout with transparency"""
 
-    title = "WangZhe Auto Clicker v3.2.0"
+    def __init__(self, **kwargs):
+        super(FloatingBoxLayout, self).__init__(**kwargs)
+
+        # Set transparency
+        with self.canvas.before:
+            Color(0, 0, 0, 0.5)  # 50% transparent black
+            self.rect = Rectangle(size=self.size, pos=self.pos)
+
+        self.bind(size=self._update_rect, pos=self._update_rect)
+
+    def _update_rect(self, instance, value):
+        self.rect.size = instance.size
+        self.rect.pos = instance.pos
+
+
+class WangZheApp(App):
+    """WangZhe Auto Clicker - Floating Window"""
+
+    title = "WangZhe Auto Clicker v3.3.0"
 
     def build(self):
-        layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
+        # Set window transparency and size
+        Window.size = (300, 500)  # Floating window size
+        Window.left = 100
+        Window.top = 100
+
+        # Create floating layout
+        layout = FloatingBoxLayout(orientation='vertical', padding=10, spacing=10)
 
         # Title
         title = Label(
-            text="WangZhe Auto Clicker\nv3.2.0 - With Screenshot",
+            text="WangZhe Clicker\nv3.3.0 - Floating",
             size_hint_y=None,
-            height=100,
-            font_size='22sp',
+            height=60,
+            font_size='16sp',
             bold=True
         )
         layout.add_widget(title)
@@ -406,8 +507,8 @@ class WangZheApp(App):
         self.status = Label(
             text="Status: Initializing...",
             size_hint_y=None,
-            height=80,
-            font_size='14sp'
+            height=60,
+            font_size='12sp'
         )
         layout.add_widget(self.status)
 
@@ -417,39 +518,42 @@ class WangZheApp(App):
         # Initialize clicker
         self.clicker = SimpleClicker()
 
-        # Update status after 1.5 seconds
-        Clock.schedule_once(self._update_status, 1.5)
+        # Update status after 2 seconds
+        Clock.schedule_once(self._update_status, 2.0)
 
-        # Scroll area
-        scroll = ScrollView()
-        btns = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
-        btns.bind(minimum_height=btns.setter('height'))
+        # Buttons
+        btn_layout = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
+        btn_layout.bind(minimum_height=btn_layout.setter('height'))
 
         # Run full flow button
-        flow_btn = Button(text="Run Full Flow (11 Steps)", size_hint_y=None, height=70)
+        flow_btn = Button(text="Run Flow (11 Steps)", size_hint_y=None, height=50)
         flow_btn.bind(on_press=self._run_flow)
-        btns.add_widget(flow_btn)
+        btn_layout.add_widget(flow_btn)
 
         # Test click button
-        test_btn = Button(text="Test Click (Screen Center)", size_hint_y=None, height=70)
+        test_btn = Button(text="Test Click", size_hint_y=None, height=50)
         test_btn.bind(on_press=self._test_click)
-        btns.add_widget(test_btn)
+        btn_layout.add_widget(test_btn)
 
-        # Step buttons
-        for state_name in ['login', 'game_lobby', 'match_screen', 'start_game_screen']:
+        # Quick step buttons
+        for state_name in ['login', 'game_lobby', 'start_game_screen']:
             state = SimpleClicker.STATES[state_name]
-            btn = Button(text=f"{state['name']}: {state['desc']}", size_hint_y=None, height=60)
-            btn.state_name = state_name  # Store state_name in button
+            btn = Button(text=f"{state['name']}", size_hint_y=None, height=40)
+            btn.state_name = state_name
             btn.bind(on_press=self._run_step)
-            btns.add_widget(btn)
+            btn_layout.add_widget(btn)
 
         # Refresh status
-        refresh_btn = Button(text="Refresh Status", size_hint_y=None, height=70)
+        refresh_btn = Button(text="Refresh Status", size_hint_y=None, height=50)
         refresh_btn.bind(on_press=self._refresh)
-        btns.add_widget(refresh_btn)
+        btn_layout.add_widget(refresh_btn)
 
-        scroll.add_widget(btns)
-        layout.add_widget(scroll)
+        # Exit button
+        exit_btn = Button(text="Exit", size_hint_y=None, height=50)
+        exit_btn.bind(on_press=self._exit_app)
+        btn_layout.add_widget(exit_btn)
+
+        layout.add_widget(btn_layout)
 
         print("UI build completed")
         return layout
@@ -459,14 +563,16 @@ class WangZheApp(App):
         if self.clicker.is_initialized and ANDROID_API_AVAILABLE:
             w, h = self.clicker.get_screen_size()
             cv_status = "CV OK" if CV_AVAILABLE else "CV N/A"
-            self.status.text = f"Status: OK\nScreen: {w}x{h}\n{cv_status}"
+            root_status = "ROOT OK" if self.clicker.has_root else "ROOT N/A"
+            perm_status = "PERM OK" if self.clicker.has_permissions else "PERM N/A"
+            self.status.text = f"Screen: {w}x{h}\n{cv_status}\n{root_status}\n{perm_status}"
         else:
-            self.status.text = "Status: Test Mode\nScreen: 1280x720"
+            self.status.text = "Status: Test Mode"
 
     def _run_flow(self, instance):
         """Run full flow"""
         print(f"[BUTTON] Run Full Flow button pressed")
-        self.status.text = "Running full flow..."
+        self.status.text = "Running flow..."
         self.clicker.run_full_flow(callback=self._update_flow_status)
 
     def _update_flow_status(self, message):
@@ -478,10 +584,8 @@ class WangZheApp(App):
         """Test click"""
         self.click_count += 1
         print(f"[BUTTON] Test Click button pressed (count: {self.click_count})")
-        print(f"[BUTTON] Calling clicker.click(640, 360)")
         self.clicker.click(640, 360)
         self.status.text = f"Clicked: (640, 360)\nCount: {self.click_count}"
-        print(f"[BUTTON] Click function returned")
 
     def _run_step(self, instance):
         """Run single step"""
@@ -494,10 +598,15 @@ class WangZheApp(App):
         """Refresh"""
         self._update_status(0)
 
+    def _exit_app(self, instance):
+        """Exit app"""
+        print("[APP] Exit requested")
+        App.get_running_app().stop()
+
 
 if __name__ == '__main__':
     print("========================================")
-    print("Starting Kivy App")
+    print("Starting Kivy App - Floating Window")
     print("========================================")
     try:
         WangZheApp().run()

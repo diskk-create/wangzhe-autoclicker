@@ -13,7 +13,7 @@ source.include_exts = py,png,jpg,kv,atlas,json,txt
 source.include_dirs = templates
 
 # Version
-version = 3.2.0
+version = 3.3.0
 
 # Dependencies - Include OpenCV for image recognition
 requirements = python3,kivy,pyjnius,opencv,numpy
@@ -24,8 +24,8 @@ orientation = landscape
 # Fullscreen
 fullscreen = 0
 
-# Android permissions
-android.permissions = INTERNET
+# Android permissions - 需要的权限
+android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,SYSTEM_ALERT_WINDOW,ACCESSIBILITY_SERVICES
 
 # Android API
 android.api = 33
