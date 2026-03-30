@@ -278,28 +278,44 @@ class SimpleClicker:
             return None
 
         try:
-            from jnius import autoclass
-            Runtime = autoclass('java.lang.Runtime')
-            TimeUnit = autoclass('java.util.concurrent.TimeUnit')
-            runtime = Runtime.getRuntime()
+            import cv2
 
-            # Capture screen to file
-            process = runtime.exec("screencap -p /sdcard/screen.png")
-            process.waitFor(2, TimeUnit.SECONDS)
+            # Use app's private directory for screenshots
+            if mActivity:
+                files_dir = mActivity.getFilesDir().getAbsolutePath()
+                screenshot_path = f"{files_dir}/screen.png"
+            else:
+                screenshot_path = "/data/user/0/org.wangzhe.wangzheautoclicker/files/screen.png"
+
+            print(f"[CAPTURE] Saving to: {screenshot_path}")
+
+            # Capture screen
+            import subprocess
+            result = subprocess.run(
+                f"screencap -p {screenshot_path}",
+                shell=True,
+                capture_output=True,
+                timeout=3
+            )
+
+            if result.returncode != 0:
+                print(f"[CAPTURE] screencap failed: {result.stderr.decode()}")
+                return None
 
             # Read image
-            import cv2
-            img = cv2.imread("/sdcard/screen.png")
+            img = cv2.imread(screenshot_path)
 
             if img is not None:
                 print(f"[CAPTURE] Screen captured: {img.shape}")
                 return img
             else:
-                print("[CAPTURE] Failed to read screenshot")
+                print("[CAPTURE] Failed to read screenshot file")
                 return None
 
         except Exception as e:
             print(f"[CAPTURE] Error: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def click(self, x, y):
@@ -451,7 +467,7 @@ class FloatingBoxLayout(BoxLayout):
 class WangZheApp(App):
     """WangZhe Auto Clicker - Floating Window"""
 
-    title = "WangZhe Auto Clicker v3.3.4"
+    title = "WangZhe Auto Clicker v3.3.5"
 
     def build(self):
         # Set window transparency and size
@@ -464,7 +480,7 @@ class WangZheApp(App):
 
         # Title
         title = Label(
-            text="WangZhe Clicker\nv3.3.4 - Fixed ROOT",
+            text="WangZhe Clicker\nv3.3.5 - Fixed Screenshot",
             size_hint_y=None,
             height=60,
             font_size='16sp',
